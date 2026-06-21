@@ -77,9 +77,6 @@
     .btn.ghost { background: transparent; }
     .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
-    .stat { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
-    .stat strong { display: block; font-size: 1.4rem; }
 
     .site-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 16px; }
     .site-card { text-align: left; width: 100%; border-radius: 20px; padding: 16px; background: #fff; border: 1px solid var(--line); transition: transform .15s, box-shadow .15s; }
@@ -102,7 +99,6 @@
       touch-action: manipulation;
     }
     .block.dragging { opacity: .6; outline: 3px solid rgba(95,99,242,.25); }
-    .block.reorder-mode { outline: 3px solid rgba(24,169,153,.25); }
     .block-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
     .grab { color: var(--muted); font-weight: 900; user-select: none; }
     .rendered-text { white-space: pre-wrap; line-height: 1.8; word-break: break-word; }
@@ -130,7 +126,6 @@
       .hero, .editor-layout { grid-template-columns: 1fr; }
       .editor-top { align-items: stretch; flex-direction: column; }
       .toolbar .btn { flex: 1; }
-      .stat-grid { grid-template-columns: 1fr; }
       .bottom-add-bar { border-radius: 24px; align-items: stretch; flex-direction: column; }
       .bottom-add-bar span { padding-left: 0; text-align: center; }
     }
@@ -147,11 +142,6 @@
           <div class="hero-actions">
             <button class="btn primary" id="newSiteBtn">＋ 新規作成</button>
             <button class="btn" id="showIdBtn">自分のIDを見る</button>
-          </div>
-          <div class="stat-grid" aria-label="CreateWebsiteの特徴">
-            <div class="stat"><strong>1タップ</strong><span>ブロック追加</span></div>
-            <div class="stat"><strong>QR</strong><span>共有リンク生成</span></div>
-            <div class="stat"><strong>🤝</strong><span>共同編集対応</span></div>
           </div>
         </div>
         <div class="panel">
@@ -215,8 +205,7 @@
   <dialog id="textDialog">
     <form method="dialog" class="dialog-body">
       <h2>テキストブロック</h2>
-      <p>太字はPCなら Ctrl+B、スマホなら選択後に「太字」ボタンで変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
-      <div class="toolbar"><button class="btn small" id="boldTextBtn" type="button">太字</button></div>
+      <p>太字はPCなら Ctrl+B、スマホなら文字選択後の標準フォーマット機能で変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
       <div class="field"><label for="textInput">本文</label><div id="textInput" class="rich-editor" contenteditable="true"></div></div>
       <div class="toolbar"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" id="applyTextBtn" value="default">反映</button></div>
     </form>
@@ -341,8 +330,8 @@
       }
       els.canvas.innerHTML = state.current.blocks.map((block, index) => `
         <article class="block" draggable="true" data-block="${block.id}">
-          <div class="block-head"><span class="grab" data-action="reorder">☰ ${index + 1}. 長押しで並び替え</span><div class="toolbar">
-            <button class="btn small" data-action="up" aria-label="上へ">↑</button><button class="btn small" data-action="down" aria-label="下へ">↓</button><button class="btn small" data-action="edit">編集</button><button class="btn small" data-action="copy">複製</button><button class="btn small danger" data-action="delete">削除</button>
+          <div class="block-head"><span class="grab" title="ドラッグして並び替え">☰ ${index + 1}. ドラッグで並び替え</span><div class="toolbar">
+            <button class="btn small" data-action="edit">編集</button><button class="btn small" data-action="copy">複製</button><button class="btn small danger" data-action="delete">削除</button>
           </div></div>
           <div class="rendered-text">${renderFormattedBlock(block)}</div>
         </article>`).join('');
@@ -427,7 +416,6 @@
     $('#copyIdBtn').addEventListener('click', () => navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました')));
     $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
     $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。'));
-    $('#boldTextBtn').addEventListener('click', () => { els.textInput.focus(); document.execCommand('bold'); });
     els.title.addEventListener('input', () => { state.current.title = els.title.value; els.heading.textContent = state.current.title || '無題のサイト'; });
     els.urlMode.addEventListener('change', () => els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom'));
     els.urlMode.dispatchEvent(new Event('change'));
@@ -450,24 +438,12 @@
       const action = event.target.dataset.action;
       if (!blockEl || !action) return;
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
-      if (action === 'reorder') blockEl.classList.toggle('reorder-mode');
-      if (action === 'up' && index > 0) [state.current.blocks[index - 1], state.current.blocks[index]] = [state.current.blocks[index], state.current.blocks[index - 1]];
-      if (action === 'down' && index < state.current.blocks.length - 1) [state.current.blocks[index + 1], state.current.blocks[index]] = [state.current.blocks[index], state.current.blocks[index + 1]];
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
       if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
       if (action === 'delete') state.current.blocks.splice(index, 1);
       renderBlocks();
     });
 
-    let pressTimer = null;
-    els.canvas.addEventListener('pointerdown', (event) => {
-      const handle = event.target.closest('[data-action="reorder"]');
-      if (!handle) return;
-      const blockEl = handle.closest('[data-block]');
-      pressTimer = setTimeout(() => blockEl.classList.add('reorder-mode'), 420);
-    });
-    els.canvas.addEventListener('pointerup', () => clearTimeout(pressTimer));
-    els.canvas.addEventListener('pointercancel', () => clearTimeout(pressTimer));
 
     let dragId = null;
     els.canvas.addEventListener('dragstart', (event) => { dragId = event.target.dataset.block; event.target.classList.add('dragging'); });
