@@ -87,7 +87,7 @@
     .site-card strong { display: block; font-size: 1.08rem; margin-bottom: 8px; }
     .site-card span { color: var(--muted); font-size: .9rem; word-break: break-all; }
 
-    .editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+    .editor-layout { display: grid; gap: 16px; align-items: start; }
     .editor-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
     .field { display: grid; gap: 7px; margin: 12px 0; }
     .field label { font-weight: 800; font-size: .92rem; }
@@ -102,9 +102,12 @@
       touch-action: manipulation;
     }
     .block.dragging { opacity: .6; outline: 3px solid rgba(95,99,242,.25); }
+    .block.reorder-mode { outline: 3px solid rgba(24,169,153,.25); }
     .block-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
     .grab { color: var(--muted); font-weight: 900; user-select: none; }
     .rendered-text { white-space: pre-wrap; line-height: 1.8; word-break: break-word; }
+    .rich-editor { min-height: 180px; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: #fff; line-height: 1.8; outline: none; }
+    .rich-editor:focus { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(95,99,242,.12); }
 
     .bottom-add-bar {
       position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 28px));
@@ -172,16 +175,8 @@
       </div>
 
       <div class="editor-layout">
-        <div class="panel">
-          <div class="field">
-            <label for="titleInput">サイトタイトル</label>
-            <input id="titleInput" placeholder="例：自己紹介" />
-          </div>
-          <div class="canvas" id="blockCanvas" aria-live="polite"></div>
-        </div>
-
-        <aside class="panel">
-          <h3>公開設定</h3>
+        <section class="panel" aria-labelledby="publishSettingsTitle">
+          <h3 id="publishSettingsTitle">公開設定</h3>
           <div class="field">
             <label for="urlMode">初回保存時のURL形式</label>
             <select id="urlMode">
@@ -199,28 +194,42 @@
             <input id="editKeyInput" placeholder="例：abc123" />
           </div>
           <p class="notice">Keyを設定すると、共有画面で「閲覧用」と「共同編集用」を切り替えられます。</p>
+        </section>
+
+        <section class="panel">
           <div class="field">
-            <label>自分のID</label>
-            <button class="id-pill" id="ownerIdBtn" type="button">ID: ••••</button>
+            <label for="titleInput">サイトタイトル</label>
+            <input id="titleInput" placeholder="例：自己紹介" />
           </div>
-          <button class="btn danger" id="mergeIdBtn" type="button">ID統合を試す</button>
-        </aside>
+          <div class="canvas" id="blockCanvas" aria-live="polite"></div>
+        </section>
       </div>
     </section>
   </main>
 
   <div class="bottom-add-bar hidden" id="addBar">
     <span>下からブロックを追加できます</span>
-    <button class="btn primary" id="addTextBtn">＋ テキスト追加</button>
+    <button class="btn primary" id="addTextBtn">＋ 追加</button>
   </div>
 
   <dialog id="textDialog">
     <form method="dialog" class="dialog-body">
       <h2>テキストブロック</h2>
-      <p>B太字B、#ff0000赤文字#ff0000 のような簡易文法が使えます。</p>
-      <div class="field"><label for="textInput">本文</label><textarea id="textInput" rows="7"></textarea></div>
+      <p>太字はPCなら Ctrl+B、スマホなら選択後に「太字」ボタンで変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
+      <div class="toolbar"><button class="btn small" id="boldTextBtn" type="button">太字</button></div>
+      <div class="field"><label for="textInput">本文</label><div id="textInput" class="rich-editor" contenteditable="true"></div></div>
       <div class="toolbar"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" id="applyTextBtn" value="default">反映</button></div>
     </form>
+  </dialog>
+
+
+  <dialog id="idDialog">
+    <div class="dialog-body">
+      <h2>自分のID</h2>
+      <p>IDは作成したサイトの持ち主判定に使います。普段は伏せて表示します。</p>
+      <button class="id-pill" id="ownerIdBtn" type="button">ID: ••••</button>
+      <div class="toolbar" style="margin-top:14px"><button class="btn" id="copyIdBtn">IDコピー</button><button class="btn danger" id="mergeIdBtn" type="button">ID統合</button><button class="btn" id="closeIdBtn">閉じる</button></div>
+    </div>
   </dialog>
 
   <dialog id="shareDialog">
@@ -249,7 +258,7 @@
       home: $('#homeView'), editor: $('#editorView'), addBar: $('#addBar'), siteList: $('#siteList'),
       title: $('#titleInput'), heading: $('#editorHeading'), canvas: $('#blockCanvas'), urlMode: $('#urlMode'),
       customUrl: $('#customUrlInput'), customUrlField: $('#customUrlField'), key: $('#editKeyInput'),
-      textDialog: $('#textDialog'), textInput: $('#textInput'), shareDialog: $('#shareDialog'),
+      textDialog: $('#textDialog'), textInput: $('#textInput'), idDialog: $('#idDialog'), shareDialog: $('#shareDialog'),
       qrBox: $('#qrBox'), shareUrl: $('#shareUrl'), shareTabs: $('#shareTabs')
     };
 
@@ -294,7 +303,7 @@
         isPublic: true,
         collaborative: false,
         collaborators: [],
-        blocks: [{ id: crypto.randomUUID(), type: 'text', text: 'こんにちは\nB太字B\n#ff0000赤文字#ff0000' }],
+        blocks: [{ id: crypto.randomUUID(), type: 'text', html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'" }],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -327,22 +336,37 @@
     function renderBlocks() {
       els.heading.textContent = state.current.title || '無題のサイト';
       if (!state.current.blocks.length) {
-        els.canvas.innerHTML = '<div class="empty">下の「＋ テキスト追加」から本文を追加してください。</div>';
+        els.canvas.innerHTML = '<div class="empty">下の「＋ 追加」から本文を追加してください。</div>';
         return;
       }
       els.canvas.innerHTML = state.current.blocks.map((block, index) => `
         <article class="block" draggable="true" data-block="${block.id}">
-          <div class="block-head"><span class="grab">☰ ${index + 1}. テキスト</span><div class="toolbar">
-            <button class="btn small" data-action="edit">編集</button><button class="btn small" data-action="copy">複製</button><button class="btn small danger" data-action="delete">削除</button>
+          <div class="block-head"><span class="grab" data-action="reorder">☰ ${index + 1}. 長押しで並び替え</span><div class="toolbar">
+            <button class="btn small" data-action="up" aria-label="上へ">↑</button><button class="btn small" data-action="down" aria-label="下へ">↓</button><button class="btn small" data-action="edit">編集</button><button class="btn small" data-action="copy">複製</button><button class="btn small danger" data-action="delete">削除</button>
           </div></div>
-          <div class="rendered-text">${decorateText(block.text)}</div>
+          <div class="rendered-text">${renderFormattedBlock(block)}</div>
         </article>`).join('');
     }
 
-    function decorateText(text) {
-      return escapeHtml(text)
-        .replace(/B(.+?)B/g, '<strong>$1</strong>')
-        .replace(/#([0-9a-fA-F]{6})(.*?)#\1/g, '<span style="color:#$1">$2</span>');
+    function renderFormattedBlock(block) {
+      return sanitizeRichHtml(block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>'))
+        .replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    }
+
+    function sanitizeRichHtml(value) {
+      const template = document.createElement('template');
+      template.innerHTML = value;
+      template.content.querySelectorAll('*').forEach((node) => {
+        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(node.tagName)) node.replaceWith(...node.childNodes);
+        if (node.tagName === 'SPAN') {
+          const color = node.style.color;
+          node.removeAttribute('style');
+          if (color) node.style.color = color;
+        } else {
+          [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+        }
+      });
+      return template.innerHTML;
     }
 
     function escapeHtml(value) {
@@ -379,7 +403,7 @@
     function openTextDialog(blockId = null) {
       state.editingBlockId = blockId;
       const block = state.current.blocks.find((item) => item.id === blockId);
-      els.textInput.value = block?.text || '';
+      els.textInput.innerHTML = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
       els.textDialog.showModal();
     }
 
@@ -398,17 +422,20 @@
     $('#backBtn').addEventListener('click', () => { els.editor.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); loadSites(); });
     $('#saveBtn').addEventListener('click', saveCurrent);
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
-    $('#showIdBtn').addEventListener('click', () => alert(`ID: ${creatorId()}`));
-    $('#ownerIdBtn').addEventListener('click', (event) => { event.currentTarget.textContent = `ID: ${creatorId()}`; navigator.clipboard?.writeText(creatorId()); });
-    $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。実装時は統合先IDの確認入力を追加してください。') && alert('デモでは統合の流れだけ表示しています。'));
+    $('#showIdBtn').addEventListener('click', () => { $('#ownerIdBtn').textContent = 'ID: ••••'; els.idDialog.showModal(); });
+    $('#ownerIdBtn').addEventListener('click', (event) => { event.currentTarget.textContent = `ID: ${creatorId()}`; });
+    $('#copyIdBtn').addEventListener('click', () => navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました')));
+    $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
+    $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。'));
+    $('#boldTextBtn').addEventListener('click', () => { els.textInput.focus(); document.execCommand('bold'); });
     els.title.addEventListener('input', () => { state.current.title = els.title.value; els.heading.textContent = state.current.title || '無題のサイト'; });
     els.urlMode.addEventListener('change', () => els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom'));
     els.urlMode.dispatchEvent(new Event('change'));
 
     $('#applyTextBtn').addEventListener('click', () => {
-      const text = els.textInput.value.trim() || '新しいテキスト';
-      if (state.editingBlockId) state.current.blocks.find((item) => item.id === state.editingBlockId).text = text;
-      else state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', text });
+      const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
+      if (state.editingBlockId) state.current.blocks.find((item) => item.id === state.editingBlockId).html = html;
+      else state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       renderBlocks();
     });
 
@@ -423,11 +450,24 @@
       const action = event.target.dataset.action;
       if (!blockEl || !action) return;
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
+      if (action === 'reorder') blockEl.classList.toggle('reorder-mode');
+      if (action === 'up' && index > 0) [state.current.blocks[index - 1], state.current.blocks[index]] = [state.current.blocks[index], state.current.blocks[index - 1]];
+      if (action === 'down' && index < state.current.blocks.length - 1) [state.current.blocks[index + 1], state.current.blocks[index]] = [state.current.blocks[index], state.current.blocks[index + 1]];
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
       if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
       if (action === 'delete') state.current.blocks.splice(index, 1);
       renderBlocks();
     });
+
+    let pressTimer = null;
+    els.canvas.addEventListener('pointerdown', (event) => {
+      const handle = event.target.closest('[data-action="reorder"]');
+      if (!handle) return;
+      const blockEl = handle.closest('[data-block]');
+      pressTimer = setTimeout(() => blockEl.classList.add('reorder-mode'), 420);
+    });
+    els.canvas.addEventListener('pointerup', () => clearTimeout(pressTimer));
+    els.canvas.addEventListener('pointercancel', () => clearTimeout(pressTimer));
 
     let dragId = null;
     els.canvas.addEventListener('dragstart', (event) => { dragId = event.target.dataset.block; event.target.classList.add('dragging'); });
