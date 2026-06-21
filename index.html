@@ -232,16 +232,25 @@
   </dialog>
 
   <script type="module">
-    // Firebaseを使う場合は、下記を自分のプロジェクト設定に置き換えてください。
-    // import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    // import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    // import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    const firebaseConfig = null;
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    // Firebaseに保存するには、自分のFirebaseプロジェクト設定を入れてください。
+    // 空のままだと開発用にlocalStorageへ保存します。
+    const firebaseConfig = {
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: ''
+    };
 
     const STORAGE_KEY = 'createwebsite:sites:v1';
     const COOKIE_KEY = 'createwebsiteCreatorId';
     const $ = (selector) => document.querySelector(selector);
-    const state = { sites: [], current: null, editingBlockId: null, shareMode: 'view' };
+    const state = { sites: [], current: null, editingBlockId: null, shareMode: 'view', uid: null, db: null, firebaseReady: false };
 
     const els = {
       home: $('#homeView'), editor: $('#editorView'), addBar: $('#addBar'), siteList: $('#siteList'),
@@ -250,6 +259,35 @@
       textDialog: $('#textDialog'), textInput: $('#textInput'), idDialog: $('#idDialog'), shareDialog: $('#shareDialog'),
       qrBox: $('#qrBox'), shareUrl: $('#shareUrl'), shareTabs: $('#shareTabs')
     };
+
+    function hasFirebaseConfig() {
+      return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+    }
+
+    async function initFirebase() {
+      if (!hasFirebaseConfig()) {
+        console.warn('Firebase config is empty. Using localStorage fallback.');
+        loadSites();
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+        await signInAnonymously(auth);
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          state.uid = user.uid;
+          state.firebaseReady = true;
+          await loadSites();
+        });
+      } catch (error) {
+        console.error('Firebase initialization failed. Falling back to localStorage.', error);
+        state.firebaseReady = false;
+        loadSites();
+      }
+    }
 
     function getCookie(name) {
       return document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.split('=')[1];
@@ -268,14 +306,43 @@
       return id;
     }
 
-    function loadSites() {
-      state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    async function loadSites() {
+      if (state.firebaseReady && state.db) {
+        await loadSitesFromFirestore();
+      } else {
+        state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      }
       renderSiteList();
     }
 
-    function persistSites() {
+    async function loadSitesFromFirestore() {
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      state.sites = snapshot.docs
+        .map((item) => ({ siteId: item.id, ...item.data() }))
+        .filter((site) => site.ownerUid === state.uid || site.creatorId === creatorId() || site.collaborators?.includes(state.uid))
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    }
+
+    async function persistSites() {
+      if (state.firebaseReady && state.db && state.current) {
+        await saveSiteToFirestore(state.current);
+        return;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sites));
     }
+
+    async function saveSiteToFirestore(site) {
+      const payload = {
+        ...site,
+        ownerUid: site.ownerUid || state.uid,
+        creatorId: site.creatorId || creatorId(),
+        collaborators: site.collaborators || [],
+        updatedAt: new Date().toISOString(),
+        updatedAtServer: serverTimestamp()
+      };
+      await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
+    }
+
 
     function slugify(value) {
       return (value || 'untitled').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '').slice(0, 48) || crypto.randomUUID().slice(0, 8);
@@ -285,7 +352,7 @@
       return {
         siteId: crypto.randomUUID().slice(0, 8),
         title: '無題のサイト',
-        ownerUid: 'anonymous-local-user',
+        ownerUid: state.uid || 'anonymous-local-user',
         creatorId: creatorId(),
         customUrl: '',
         key: '',
@@ -312,11 +379,11 @@
 
     function renderSiteList() {
       if (!state.sites.length) {
-        els.siteList.innerHTML = '<p class="empty">まだサイトがありません。「新規作成」から始めましょう。</p>';
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
         return;
       }
       els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = site.creatorId === creatorId();
+        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
         const handshake = site.collaborative && mine ? '🤝 ' : '';
         return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
       }).join('');
@@ -372,8 +439,9 @@
       return state.shareMode === 'edit' && state.current.key ? `${base}/${encodeURIComponent(state.current.key)}` : base;
     }
 
-    function saveCurrent() {
+    async function saveCurrent() {
       state.current.title = els.title.value.trim() || '無題のサイト';
+      state.current.ownerUid = state.current.ownerUid === 'anonymous-local-user' && state.uid ? state.uid : state.current.ownerUid;
       state.current.key = els.key.value.trim();
       state.current.collaborative = Boolean(state.current.key);
       if (!state.current.customUrl) {
@@ -383,10 +451,10 @@
       const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
       if (index >= 0) state.sites[index] = structuredClone(state.current);
       else state.sites.unshift(structuredClone(state.current));
-      persistSites();
-      renderSiteList();
+      await persistSites();
+      await loadSites();
       renderBlocks();
-      alert('保存しました。');
+      alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
     function openTextDialog(blockId = null) {
@@ -408,8 +476,8 @@
     }
 
     $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
-    $('#backBtn').addEventListener('click', () => { els.editor.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); loadSites(); });
-    $('#saveBtn').addEventListener('click', saveCurrent);
+    $('#backBtn').addEventListener('click', async () => { els.editor.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); await loadSites(); });
+    $('#saveBtn').addEventListener('click', () => saveCurrent());
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
     $('#showIdBtn').addEventListener('click', () => { $('#ownerIdBtn').textContent = 'ID: ••••'; els.idDialog.showModal(); });
     $('#ownerIdBtn').addEventListener('click', (event) => { event.currentTarget.textContent = `ID: ${creatorId()}`; });
@@ -440,10 +508,9 @@
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
       if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
-      if (action === 'delete') state.current.blocks.splice(index, 1);
+      if (action === 'delete' && confirm('このブロックを削除しますか？')) state.current.blocks.splice(index, 1);
       renderBlocks();
     });
-
 
     let dragId = null;
     els.canvas.addEventListener('dragstart', (event) => { dragId = event.target.dataset.block; event.target.classList.add('dragging'); });
@@ -471,9 +538,9 @@
       updateQr();
     });
 
-    if (firebaseConfig) console.info('Firebase config detected. Wire Authentication and Firestore here.');
     creatorId();
-    loadSites();
+    initFirebase();
   </script>
+
 </body>
 </html>
