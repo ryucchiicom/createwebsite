@@ -1,1 +1,463 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CreateWebsite</title>
+  <meta name="description" content="メモアプリ感覚でWebサイトを作って公開できるサービス" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7fb;
+      --card: rgba(255, 255, 255, 0.92);
+      --ink: #1c2430;
+      --muted: #667085;
+      --line: #e4e7ec;
+      --brand: #5f63f2;
+      --brand-dark: #494de4;
+      --accent: #18a999;
+      --danger: #ef4444;
+      --shadow: 0 18px 50px rgba(28, 36, 48, 0.12);
+      --radius: 22px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
 
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(95, 99, 242, 0.18), transparent 34rem),
+        radial-gradient(circle at 100% 10%, rgba(24, 169, 153, 0.15), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; border: 0; }
+    textarea { resize: vertical; }
+    .app-shell { width: min(1120px, 100%); margin: 0 auto; padding: 20px 16px 112px; }
+    .hidden { display: none !important; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: stretch;
+      margin: 12px 0 20px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.74);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      backdrop-filter: blur(14px);
+    }
+    .eyebrow { color: var(--brand); font-weight: 800; letter-spacing: .08em; font-size: 0.78rem; }
+    h1, h2, h3 { margin: 0; line-height: 1.15; }
+    h1 { font-size: clamp(2rem, 7vw, 4.5rem); letter-spacing: -0.06em; margin-top: 8px; }
+    h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
+    p { color: var(--muted); line-height: 1.8; }
+    .hero-actions, .toolbar, .row, .tabs { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .btn {
+      min-height: 44px;
+      border-radius: 999px;
+      padding: 0 18px;
+      font-weight: 800;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .btn.primary { background: var(--brand); color: #fff; box-shadow: 0 10px 24px rgba(95, 99, 242, .28); }
+    .btn.primary:hover { background: var(--brand-dark); }
+    .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
+    .btn.ghost { background: transparent; }
+    .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+    .stat { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+    .stat strong { display: block; font-size: 1.4rem; }
+
+    .site-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 16px; }
+    .site-card { text-align: left; width: 100%; border-radius: 20px; padding: 16px; background: #fff; border: 1px solid var(--line); transition: transform .15s, box-shadow .15s; }
+    .site-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(28, 36, 48, .1); }
+    .site-card strong { display: block; font-size: 1.08rem; margin-bottom: 8px; }
+    .site-card span { color: var(--muted); font-size: .9rem; word-break: break-all; }
+
+    .editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+    .editor-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .field { display: grid; gap: 7px; margin: 12px 0; }
+    .field label { font-weight: 800; font-size: .92rem; }
+    .field input, .field textarea, .field select {
+      width: 100%; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: #fff; color: var(--ink);
+    }
+
+    .canvas { min-height: 52vh; padding: 18px; background: rgba(255,255,255,.58); border: 1px dashed #cdd3df; border-radius: var(--radius); }
+    .empty { text-align: center; padding: 60px 14px; color: var(--muted); }
+    .block {
+      background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px;
+      touch-action: manipulation;
+    }
+    .block.dragging { opacity: .6; outline: 3px solid rgba(95,99,242,.25); }
+    .block-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .grab { color: var(--muted); font-weight: 900; user-select: none; }
+    .rendered-text { white-space: pre-wrap; line-height: 1.8; word-break: break-word; }
+
+    .bottom-add-bar {
+      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 28px));
+      display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 12px;
+      background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); z-index: 30;
+    }
+    .bottom-add-bar span { color: var(--muted); font-weight: 700; padding-left: 12px; }
+
+    dialog { width: min(620px, calc(100% - 24px)); border: 0; border-radius: 26px; padding: 0; box-shadow: var(--shadow); }
+    dialog::backdrop { background: rgba(15, 23, 42, .42); backdrop-filter: blur(4px); }
+    .dialog-body { padding: 22px; }
+    .qr-box { width: 220px; height: 220px; display: grid; place-items: center; margin: 10px auto 16px; border-radius: 20px; background: #f2f4f7; color: var(--muted); overflow: hidden; }
+    .share-url { word-break: break-all; background: #f8fafc; border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+    .tab { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font-weight: 800; }
+    .tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+    .id-pill { display: inline-flex; gap: 8px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; }
+    .notice { background: #eef2ff; color: #3730a3; border-radius: 16px; padding: 12px; line-height: 1.7; }
+
+    @media (max-width: 820px) {
+      .hero, .editor-layout { grid-template-columns: 1fr; }
+      .editor-top { align-items: stretch; flex-direction: column; }
+      .toolbar .btn { flex: 1; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .bottom-add-bar { border-radius: 24px; align-items: stretch; flex-direction: column; }
+      .bottom-add-bar span { padding-left: 0; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section id="homeView">
+      <div class="hero">
+        <div class="panel">
+          <div class="eyebrow">CreateWebsite</div>
+          <h1>メモを書くように、サイトを作ろう。</h1>
+          <p>HTML、GitHub、Firebaseを知らなくても大丈夫。テキストブロックを追加して保存するだけで、共有できるWebページを作れます。</p>
+          <div class="hero-actions">
+            <button class="btn primary" id="newSiteBtn">＋ 新規作成</button>
+            <button class="btn" id="showIdBtn">自分のIDを見る</button>
+          </div>
+          <div class="stat-grid" aria-label="CreateWebsiteの特徴">
+            <div class="stat"><strong>1タップ</strong><span>ブロック追加</span></div>
+            <div class="stat"><strong>QR</strong><span>共有リンク生成</span></div>
+            <div class="stat"><strong>🤝</strong><span>共同編集対応</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>自分のサイト一覧</h2>
+          <p>この端末で作成・共同編集したサイトを表示します。Firebase設定前はブラウザ内に保存されます。</p>
+          <div class="site-grid" id="siteList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="editorView" class="hidden">
+      <div class="editor-top">
+        <div>
+          <button class="btn ghost" id="backBtn">← 一覧へ</button>
+          <h2 id="editorHeading">無題のサイト</h2>
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="shareBtn">共有</button>
+          <button class="btn primary" id="saveBtn">保存</button>
+        </div>
+      </div>
+
+      <div class="editor-layout">
+        <div class="panel">
+          <div class="field">
+            <label for="titleInput">サイトタイトル</label>
+            <input id="titleInput" placeholder="例：自己紹介" />
+          </div>
+          <div class="canvas" id="blockCanvas" aria-live="polite"></div>
+        </div>
+
+        <aside class="panel">
+          <h3>公開設定</h3>
+          <div class="field">
+            <label for="urlMode">初回保存時のURL形式</label>
+            <select id="urlMode">
+              <option value="title">タイトル</option>
+              <option value="uuid">UUID</option>
+              <option value="custom">カスタム</option>
+            </select>
+          </div>
+          <div class="field" id="customUrlField">
+            <label for="customUrlInput">カスタムURL末尾</label>
+            <input id="customUrlInput" placeholder="mypage" />
+          </div>
+          <div class="field">
+            <label for="editKeyInput">共同編集Key</label>
+            <input id="editKeyInput" placeholder="例：abc123" />
+          </div>
+          <p class="notice">Keyを設定すると、共有画面で「閲覧用」と「共同編集用」を切り替えられます。</p>
+          <div class="field">
+            <label>自分のID</label>
+            <button class="id-pill" id="ownerIdBtn" type="button">ID: ••••</button>
+          </div>
+          <button class="btn danger" id="mergeIdBtn" type="button">ID統合を試す</button>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div class="bottom-add-bar hidden" id="addBar">
+    <span>下からブロックを追加できます</span>
+    <button class="btn primary" id="addTextBtn">＋ テキスト追加</button>
+  </div>
+
+  <dialog id="textDialog">
+    <form method="dialog" class="dialog-body">
+      <h2>テキストブロック</h2>
+      <p>B太字B、#ff0000赤文字#ff0000 のような簡易文法が使えます。</p>
+      <div class="field"><label for="textInput">本文</label><textarea id="textInput" rows="7"></textarea></div>
+      <div class="toolbar"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" id="applyTextBtn" value="default">反映</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="shareDialog">
+    <div class="dialog-body">
+      <h2>共有</h2>
+      <div class="tabs" id="shareTabs"><button class="tab active" data-share="view">閲覧用</button><button class="tab" data-share="edit">共同編集用</button></div>
+      <div class="qr-box" id="qrBox">生成中…</div>
+      <div class="share-url" id="shareUrl"></div>
+      <div class="toolbar" style="margin-top:14px"><button class="btn" id="copyShareBtn">URLコピー</button><button class="btn primary" id="webShareBtn">共有する</button><button class="btn" id="closeShareBtn">閉じる</button></div>
+    </div>
+  </dialog>
+
+  <script type="module">
+    // Firebaseを使う場合は、下記を自分のプロジェクト設定に置き換えてください。
+    // import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    // import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    // import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    const firebaseConfig = null;
+
+    const STORAGE_KEY = 'createwebsite:sites:v1';
+    const COOKIE_KEY = 'createwebsiteCreatorId';
+    const $ = (selector) => document.querySelector(selector);
+    const state = { sites: [], current: null, editingBlockId: null, shareMode: 'view' };
+
+    const els = {
+      home: $('#homeView'), editor: $('#editorView'), addBar: $('#addBar'), siteList: $('#siteList'),
+      title: $('#titleInput'), heading: $('#editorHeading'), canvas: $('#blockCanvas'), urlMode: $('#urlMode'),
+      customUrl: $('#customUrlInput'), customUrlField: $('#customUrlField'), key: $('#editKeyInput'),
+      textDialog: $('#textDialog'), textInput: $('#textInput'), shareDialog: $('#shareDialog'),
+      qrBox: $('#qrBox'), shareUrl: $('#shareUrl'), shareTabs: $('#shareTabs')
+    };
+
+    function getCookie(name) {
+      return document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.split('=')[1];
+    }
+
+    function setCookie(name, value) {
+      document.cookie = `${name}=${value}; max-age=31536000; path=/; SameSite=Lax`;
+    }
+
+    function creatorId() {
+      let id = getCookie(COOKIE_KEY);
+      if (!id) {
+        id = crypto.randomUUID().slice(0, 8);
+        setCookie(COOKIE_KEY, id);
+      }
+      return id;
+    }
+
+    function loadSites() {
+      state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      renderSiteList();
+    }
+
+    function persistSites() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sites));
+    }
+
+    function slugify(value) {
+      return (value || 'untitled').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '').slice(0, 48) || crypto.randomUUID().slice(0, 8);
+    }
+
+    function makeSite() {
+      return {
+        siteId: crypto.randomUUID().slice(0, 8),
+        title: '無題のサイト',
+        ownerUid: 'anonymous-local-user',
+        creatorId: creatorId(),
+        customUrl: '',
+        key: '',
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        blocks: [{ id: crypto.randomUUID(), type: 'text', text: 'こんにちは\nB太字B\n#ff0000赤文字#ff0000' }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function openEditor(site) {
+      state.current = structuredClone(site);
+      els.home.classList.add('hidden');
+      els.editor.classList.remove('hidden');
+      els.addBar.classList.remove('hidden');
+      els.title.value = state.current.title;
+      els.key.value = state.current.key || '';
+      els.customUrl.value = state.current.customUrl || '';
+      els.heading.textContent = state.current.title;
+      renderBlocks();
+    }
+
+    function renderSiteList() {
+      if (!state.sites.length) {
+        els.siteList.innerHTML = '<p class="empty">まだサイトがありません。「新規作成」から始めましょう。</p>';
+        return;
+      }
+      els.siteList.innerHTML = state.sites.map((site) => {
+        const mine = site.creatorId === creatorId();
+        const handshake = site.collaborative && mine ? '🤝 ' : '';
+        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
+      }).join('');
+    }
+
+    function renderBlocks() {
+      els.heading.textContent = state.current.title || '無題のサイト';
+      if (!state.current.blocks.length) {
+        els.canvas.innerHTML = '<div class="empty">下の「＋ テキスト追加」から本文を追加してください。</div>';
+        return;
+      }
+      els.canvas.innerHTML = state.current.blocks.map((block, index) => `
+        <article class="block" draggable="true" data-block="${block.id}">
+          <div class="block-head"><span class="grab">☰ ${index + 1}. テキスト</span><div class="toolbar">
+            <button class="btn small" data-action="edit">編集</button><button class="btn small" data-action="copy">複製</button><button class="btn small danger" data-action="delete">削除</button>
+          </div></div>
+          <div class="rendered-text">${decorateText(block.text)}</div>
+        </article>`).join('');
+    }
+
+    function decorateText(text) {
+      return escapeHtml(text)
+        .replace(/B(.+?)B/g, '<strong>$1</strong>')
+        .replace(/#([0-9a-fA-F]{6})(.*?)#\1/g, '<span style="color:#$1">$2</span>');
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    }
+
+    function shareBase(site = state.current) {
+      const path = site.customUrl || site.siteId;
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}${path}`;
+    }
+
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current.key ? `${base}/${encodeURIComponent(state.current.key)}` : base;
+    }
+
+    function saveCurrent() {
+      state.current.title = els.title.value.trim() || '無題のサイト';
+      state.current.key = els.key.value.trim();
+      state.current.collaborative = Boolean(state.current.key);
+      if (!state.current.customUrl) {
+        state.current.customUrl = els.urlMode.value === 'uuid' ? state.current.siteId : slugify(els.urlMode.value === 'custom' ? els.customUrl.value : state.current.title);
+      }
+      state.current.updatedAt = new Date().toISOString();
+      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
+      if (index >= 0) state.sites[index] = structuredClone(state.current);
+      else state.sites.unshift(structuredClone(state.current));
+      persistSites();
+      renderSiteList();
+      renderBlocks();
+      alert('保存しました。');
+    }
+
+    function openTextDialog(blockId = null) {
+      state.editingBlockId = blockId;
+      const block = state.current.blocks.find((item) => item.id === blockId);
+      els.textInput.value = block?.text || '';
+      els.textDialog.showModal();
+    }
+
+    function updateQr() {
+      const url = currentShareUrl();
+      els.shareUrl.textContent = url;
+      els.qrBox.innerHTML = '生成中…';
+      setTimeout(() => {
+        els.qrBox.innerHTML = '';
+        if (window.QRCode) new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
+        else els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
+      }, 180);
+    }
+
+    $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
+    $('#backBtn').addEventListener('click', () => { els.editor.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); loadSites(); });
+    $('#saveBtn').addEventListener('click', saveCurrent);
+    $('#addTextBtn').addEventListener('click', () => openTextDialog());
+    $('#showIdBtn').addEventListener('click', () => alert(`ID: ${creatorId()}`));
+    $('#ownerIdBtn').addEventListener('click', (event) => { event.currentTarget.textContent = `ID: ${creatorId()}`; navigator.clipboard?.writeText(creatorId()); });
+    $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。実装時は統合先IDの確認入力を追加してください。') && alert('デモでは統合の流れだけ表示しています。'));
+    els.title.addEventListener('input', () => { state.current.title = els.title.value; els.heading.textContent = state.current.title || '無題のサイト'; });
+    els.urlMode.addEventListener('change', () => els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom'));
+    els.urlMode.dispatchEvent(new Event('change'));
+
+    $('#applyTextBtn').addEventListener('click', () => {
+      const text = els.textInput.value.trim() || '新しいテキスト';
+      if (state.editingBlockId) state.current.blocks.find((item) => item.id === state.editingBlockId).text = text;
+      else state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', text });
+      renderBlocks();
+    });
+
+    els.siteList.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-site]');
+      if (!card) return;
+      openEditor(state.sites.find((site) => site.siteId === card.dataset.site));
+    });
+
+    els.canvas.addEventListener('click', (event) => {
+      const blockEl = event.target.closest('[data-block]');
+      const action = event.target.dataset.action;
+      if (!blockEl || !action) return;
+      const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
+      if (action === 'edit') openTextDialog(state.current.blocks[index].id);
+      if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
+      if (action === 'delete') state.current.blocks.splice(index, 1);
+      renderBlocks();
+    });
+
+    let dragId = null;
+    els.canvas.addEventListener('dragstart', (event) => { dragId = event.target.dataset.block; event.target.classList.add('dragging'); });
+    els.canvas.addEventListener('dragend', (event) => event.target.classList.remove('dragging'));
+    els.canvas.addEventListener('dragover', (event) => event.preventDefault());
+    els.canvas.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const target = event.target.closest('[data-block]')?.dataset.block;
+      if (!dragId || !target || dragId === target) return;
+      const from = state.current.blocks.findIndex((block) => block.id === dragId);
+      const to = state.current.blocks.findIndex((block) => block.id === target);
+      const [moved] = state.current.blocks.splice(from, 1);
+      state.current.blocks.splice(to, 0, moved);
+      renderBlocks();
+    });
+
+    $('#shareBtn').addEventListener('click', () => { state.shareMode = 'view'; els.shareDialog.showModal(); updateQr(); });
+    $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
+    $('#copyShareBtn').addEventListener('click', () => navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました')));
+    $('#webShareBtn').addEventListener('click', () => navigator.share ? navigator.share({ title: state.current.title, url: currentShareUrl() }) : alert('このブラウザはWeb Share APIに対応していません。'));
+    els.shareTabs.addEventListener('click', (event) => {
+      if (!event.target.matches('.tab')) return;
+      state.shareMode = event.target.dataset.share;
+      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab === event.target));
+      updateQr();
+    });
+
+    if (firebaseConfig) console.info('Firebase config detected. Wire Authentication and Firestore here.');
+    creatorId();
+    loadSites();
+  </script>
+</body>
+</html>
