@@ -152,6 +152,15 @@
       </div>
     </section>
 
+    <section id="viewerView" class="hidden">
+      <div class="panel">
+        <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
+        <h2 id="viewerTitle">サイト</h2>
+        <div class="canvas" id="viewerCanvas" style="margin-top:14px"></div>
+        <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="viewerEditBtn">編集する</button></div>
+      </div>
+    </section>
+
     <section id="editorView" class="hidden">
       <div class="editor-top">
         <div>
@@ -250,11 +259,11 @@
     const STORAGE_KEY = 'createwebsite:sites:v1';
     const COOKIE_KEY = 'createwebsiteCreatorId';
     const $ = (selector) => document.querySelector(selector);
-    const state = { sites: [], current: null, editingBlockId: null, shareMode: 'view', uid: null, db: null, firebaseReady: false };
+    const state = { sites: [], current: null, editingBlockId: null, shareMode: 'view', uid: null, db: null, firebaseReady: false, routeSite: null, routeKey: null };
 
     const els = {
-      home: $('#homeView'), editor: $('#editorView'), addBar: $('#addBar'), siteList: $('#siteList'),
-      title: $('#titleInput'), heading: $('#editorHeading'), canvas: $('#blockCanvas'), urlMode: $('#urlMode'),
+      home: $('#homeView'), viewer: $('#viewerView'), editor: $('#editorView'), addBar: $('#addBar'), siteList: $('#siteList'),
+      title: $('#titleInput'), heading: $('#editorHeading'), canvas: $('#blockCanvas'), viewerTitle: $('#viewerTitle'), viewerCanvas: $('#viewerCanvas'), urlMode: $('#urlMode'),
       customUrl: $('#customUrlInput'), customUrlField: $('#customUrlField'), key: $('#editKeyInput'),
       textDialog: $('#textDialog'), textInput: $('#textInput'), idDialog: $('#idDialog'), shareDialog: $('#shareDialog'),
       qrBox: $('#qrBox'), shareUrl: $('#shareUrl'), shareTabs: $('#shareTabs')
@@ -313,6 +322,7 @@
         state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       }
       renderSiteList();
+      openRouteFromHash();
     }
 
     async function loadSitesFromFirestore() {
@@ -429,14 +439,50 @@
       return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
     }
 
+    function basePageUrl() {
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    }
+
+    function parseHashRoute() {
+      const hash = decodeURI(location.hash || '');
+      if (!hash.startsWith('#/')) return { sitePath: null, key: null };
+      const [, sitePath = '', key = null] = hash.slice(2).split('/');
+      return { sitePath, key };
+    }
+
+    function openRouteFromHash() {
+      const { sitePath, key } = parseHashRoute();
+      state.routeSite = sitePath;
+      state.routeKey = key;
+      if (!sitePath) return;
+      const site = state.sites.find((item) => [item.customUrl, item.siteId, item.title].includes(sitePath));
+      if (!site) {
+        showViewer({ title: 'サイトが見つかりません', blocks: [{ id: 'not-found', type: 'text', html: 'このリンクのサイトは、まだこの端末またはFirebaseから読み込めていません。' }] }, false);
+        return;
+      }
+      if (key && site.key && key === site.key) openEditor(site);
+      else showViewer(site, Boolean(site.creatorId === creatorId() || site.ownerUid === state.uid));
+    }
+
+    function showViewer(site, canEdit) {
+      state.current = structuredClone(site);
+      els.home.classList.add('hidden');
+      els.editor.classList.add('hidden');
+      els.addBar.classList.add('hidden');
+      els.viewer.classList.remove('hidden');
+      els.viewerTitle.textContent = site.title || '無題のサイト';
+      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`).join('') || '<div class="empty">本文がありません。</div>';
+      $('#viewerEditBtn').classList.toggle('hidden', !canEdit);
+    }
+
     function shareBase(site = state.current) {
-      const path = site.customUrl || site.siteId;
-      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}${path}`;
+      const path = site.customUrl || site.siteId || slugify(site.title);
+      return `${basePageUrl()}#/${path}`;
     }
 
     function currentShareUrl() {
       const base = shareBase();
-      return state.shareMode === 'edit' && state.current.key ? `${base}/${encodeURIComponent(state.current.key)}` : base;
+      return state.shareMode === 'edit' && state.current.key ? `${base}/${state.current.key}` : base;
     }
 
     async function saveCurrent() {
@@ -452,6 +498,7 @@
       if (index >= 0) state.sites[index] = structuredClone(state.current);
       else state.sites.unshift(structuredClone(state.current));
       await persistSites();
+      history.replaceState(null, '', shareBase(state.current));
       await loadSites();
       renderBlocks();
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
@@ -476,7 +523,9 @@
     }
 
     $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
-    $('#backBtn').addEventListener('click', async () => { els.editor.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); await loadSites(); });
+    $('#backBtn').addEventListener('click', async () => { history.replaceState(null, '', location.pathname); els.editor.classList.add('hidden'); els.viewer.classList.add('hidden'); els.addBar.classList.add('hidden'); els.home.classList.remove('hidden'); await loadSites(); });
+    $('#viewerHomeBtn').addEventListener('click', async () => { history.replaceState(null, '', location.pathname); els.viewer.classList.add('hidden'); els.home.classList.remove('hidden'); await loadSites(); });
+    $('#viewerEditBtn').addEventListener('click', () => openEditor(state.current));
     $('#saveBtn').addEventListener('click', () => saveCurrent());
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
     $('#showIdBtn').addEventListener('click', () => { $('#ownerIdBtn').textContent = 'ID: ••••'; els.idDialog.showModal(); });
@@ -538,6 +587,7 @@
       updateQr();
     });
 
+    window.addEventListener('hashchange', openRouteFromHash);
     creatorId();
     initFirebase();
   </script>
