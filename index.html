@@ -38,13 +38,7 @@
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; border: 0; }
     textarea { resize: vertical; }
-
-    .app-shell {
-      width: min(1120px, 100%);
-      margin: 0 auto;
-      padding: 20px 16px 112px;
-    }
-
+    .app-shell { width: min(1120px, 100%); margin: 0 auto; padding: 20px 16px 112px; }
     .hidden { display: none !important; }
 
     .hero {
@@ -54,7 +48,6 @@
       align-items: stretch;
       margin: 12px 0 20px;
     }
-
     .panel {
       background: var(--card);
       border: 1px solid rgba(255, 255, 255, 0.74);
@@ -63,25 +56,9 @@
       padding: 22px;
       backdrop-filter: blur(14px);
     }
-
-    .eyebrow {
-      color: var(--brand);
-      font-weight: 800;
-      letter-spacing: .08em;
-      font-size: 0.78rem;
-    }
-
-    h1, h2, h3 {
-      margin: 0;
-      line-height: 1.15;
-    }
-
-    h1 {
-      font-size: clamp(2rem, 7vw, 4.5rem);
-      letter-spacing: -0.06em;
-      margin-top: 8px;
-    }
-
+    .eyebrow { color: var(--brand); font-weight: 800; letter-spacing: .08em; font-size: 0.78rem; }
+    h1, h2, h3 { margin: 0; line-height: 1.15; }
+    h1 { font-size: clamp(2rem, 7vw, 4.5rem); letter-spacing: -0.06em; margin-top: 8px; }
     h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
     p { color: var(--muted); line-height: 1.8; }
 
@@ -101,25 +78,13 @@
       color: var(--ink);
       box-shadow: inset 0 0 0 1px var(--line);
     }
-
-    .btn.primary {
-      background: var(--brand);
-      color: #fff;
-      box-shadow: 0 10px 24px rgba(95, 99, 242, .28);
-    }
-
+    .btn.primary { background: var(--brand); color: #fff; box-shadow: 0 10px 24px rgba(95, 99, 242, .28); }
     .btn.primary:hover { background: var(--brand-dark); }
     .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
     .btn.ghost { background: transparent; }
     .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
 
-    .site-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 14px;
-      margin-top: 16px;
-    }
-
+    .site-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 16px; }
     .site-card {
       text-align: left;
       width: 100%;
@@ -129,44 +94,14 @@
       border: 1px solid var(--line);
       transition: transform .15s, box-shadow .15s;
     }
-
-    .site-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 14px 30px rgba(28, 36, 48, .1);
-    }
-
-    .site-card strong {
-      display: block;
-      font-size: 1.08rem;
-      margin-bottom: 8px;
-    }
-
-    .site-card span {
-      color: var(--muted);
-      font-size: .9rem;
-      word-break: break-all;
-    }
+    .site-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(28, 36, 48, .1); }
+    .site-card strong { display: block; font-size: 1.08rem; margin-bottom: 8px; }
+    .site-card span { color: var(--muted); font-size: .9rem; word-break: break-all; display: block; }
 
     .editor-layout { display: grid; gap: 16px; align-items: start; }
-    .editor-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .field {
-      display: grid;
-      gap: 7px;
-      margin: 12px 0;
-    }
-
-    .field label {
-      font-weight: 800;
-      font-size: .92rem;
-    }
-
+    .editor-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .field { display: grid; gap: 7px; margin: 12px 0; }
+    .field label { font-weight: 800; font-size: .92rem; }
     .field input, .field textarea, .field select {
       width: 100%;
       border: 1px solid var(--line);
@@ -183,13 +118,7 @@
       border: 1px dashed #cdd3df;
       border-radius: var(--radius);
     }
-
-    .empty {
-      text-align: center;
-      padding: 60px 14px;
-      color: var(--muted);
-    }
-
+    .empty { text-align: center; padding: 60px 14px; color: var(--muted); }
     .block {
       background: #fff;
       border: 1px solid var(--line);
@@ -198,32 +127,10 @@
       margin-bottom: 12px;
       touch-action: manipulation;
     }
-
-    .block.dragging {
-      opacity: .6;
-      outline: 3px solid rgba(95,99,242,.25);
-    }
-
-    .block-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .grab {
-      color: var(--muted);
-      font-weight: 900;
-      user-select: none;
-    }
-
-    .rendered-text {
-      white-space: pre-wrap;
-      line-height: 1.8;
-      word-break: break-word;
-    }
-
+    .block.dragging { opacity: .6; outline: 3px solid rgba(95,99,242,.25); }
+    .block-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .grab { color: var(--muted); font-weight: 900; user-select: none; }
+    .rendered-text { white-space: pre-wrap; line-height: 1.8; word-break: break-word; }
     .rich-editor {
       min-height: 180px;
       border: 1px solid var(--line);
@@ -232,13 +139,8 @@
       background: #fff;
       line-height: 1.8;
       outline: none;
-      white-space: pre-wrap;
     }
-
-    .rich-editor:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 4px rgba(95,99,242,.12);
-    }
+    .rich-editor:focus { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(95,99,242,.12); }
 
     .bottom-add-bar {
       position: fixed;
@@ -257,12 +159,7 @@
       box-shadow: var(--shadow);
       z-index: 30;
     }
-
-    .bottom-add-bar span {
-      color: var(--muted);
-      font-weight: 700;
-      padding-left: 12px;
-    }
+    .bottom-add-bar span { color: var(--muted); font-weight: 700; padding-left: 12px; }
 
     dialog {
       width: min(620px, calc(100% - 24px));
@@ -271,14 +168,8 @@
       padding: 0;
       box-shadow: var(--shadow);
     }
-
-    dialog::backdrop {
-      background: rgba(15, 23, 42, .42);
-      backdrop-filter: blur(4px);
-    }
-
+    dialog::backdrop { background: rgba(15, 23, 42, .42); backdrop-filter: blur(4px); }
     .dialog-body { padding: 22px; }
-
     .qr-box {
       width: 220px;
       height: 220px;
@@ -290,7 +181,6 @@
       color: var(--muted);
       overflow: hidden;
     }
-
     .share-url {
       word-break: break-all;
       background: #f8fafc;
@@ -298,7 +188,6 @@
       border-radius: 16px;
       padding: 12px;
     }
-
     .tab {
       background: #fff;
       border: 1px solid var(--line);
@@ -306,13 +195,7 @@
       padding: 9px 14px;
       font-weight: 800;
     }
-
-    .tab.active {
-      color: #fff;
-      background: var(--accent);
-      border-color: var(--accent);
-    }
-
+    .tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
     .id-pill {
       display: inline-flex;
       gap: 8px;
@@ -322,21 +205,11 @@
       border-radius: 999px;
       padding: 8px 12px;
     }
-
     .notice {
       background: #eef2ff;
       color: #3730a3;
       border-radius: 16px;
       padding: 12px;
-      line-height: 1.7;
-    }
-
-    .muted-box {
-      border: 1px solid var(--line);
-      background: #f8fafc;
-      border-radius: 16px;
-      padding: 12px;
-      color: var(--muted);
       line-height: 1.7;
     }
 
@@ -376,7 +249,7 @@
         <h2 id="viewerTitle">サイト</h2>
         <div class="canvas" id="viewerCanvas" style="margin-top:14px"></div>
         <div class="toolbar" style="margin-top:14px">
-          <button class="btn primary" id="viewerEditBtn">編集する</button>
+          <button class="btn primary hidden" id="viewerEditBtn">編集する</button>
         </div>
       </div>
     </section>
@@ -434,10 +307,10 @@
   <dialog id="textDialog">
     <form method="dialog" class="dialog-body">
       <h2>テキストブロック</h2>
-      <p>書き方はシンプルにしてあります。<code>B太字B</code> で太字、<code>#ff0000赤文字#ff0000</code> で色指定です。</p>
+      <p>太字はPCなら Ctrl+B、スマホなら文字選択後の標準フォーマット機能で変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
       <div class="field">
         <label for="textInput">本文</label>
-        <textarea id="textInput" class="rich-editor" placeholder="こんにちは&#10;B太字B&#10;#ff0000赤文字#ff0000"></textarea>
+        <div id="textInput" class="rich-editor" contenteditable="true"></div>
       </div>
       <div class="toolbar">
         <button class="btn" value="cancel">キャンセル</button>
@@ -469,9 +342,9 @@
       <div class="qr-box" id="qrBox">生成中…</div>
       <div class="share-url" id="shareUrl"></div>
       <div class="toolbar" style="margin-top:14px">
-        <button class="btn" id="copyShareBtn" type="button">URLコピー</button>
-        <button class="btn primary" id="webShareBtn" type="button">共有する</button>
-        <button class="btn" id="closeShareBtn" type="button">閉じる</button>
+        <button class="btn" id="copyShareBtn">URLコピー</button>
+        <button class="btn primary" id="webShareBtn">共有する</button>
+        <button class="btn" id="closeShareBtn">閉じる</button>
       </div>
     </div>
   </dialog>
@@ -490,12 +363,13 @@
       appId: ''
     };
 
-    const STORAGE_KEY = 'createwebsite:sites:v2';
+    const STORAGE_KEY = 'createwebsite:sites:v1';
     const COOKIE_KEY = 'createwebsiteCreatorId';
     const $ = (selector) => document.querySelector(selector);
 
     const state = {
       sites: [],
+      allSites: [],
       current: null,
       editingBlockId: null,
       shareMode: 'view',
@@ -504,7 +378,7 @@
       firebaseReady: false,
       routeSite: null,
       routeKey: null,
-      routeLoadedSite: null
+      canEditCurrent: false
     };
 
     const els = {
@@ -535,38 +409,29 @@
       return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
     }
 
-    function basePageUrl() {
-      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
-    }
-
-    function getRoute() {
-      const params = new URLSearchParams(location.search);
-      return {
-        site: params.get('site'),
-        key: params.get('key')
-      };
-    }
-
-    function setRoute(siteSlug = null, key = null, replace = false) {
-      const url = new URL(location.href);
-      url.search = '';
-
-      if (siteSlug) {
-        url.searchParams.set('site', siteSlug);
-        if (key) url.searchParams.set('key', key);
+    async function initFirebase() {
+      if (!hasFirebaseConfig()) {
+        console.warn('Firebase config is empty. Using localStorage fallback.');
+        await loadSites({ openRoute: true });
+        return;
       }
 
-      if (replace) history.replaceState({}, '', url);
-      else history.pushState({}, '', url);
-      handleRoute();
-    }
-
-    function clearRoute(replace = false) {
-      const url = new URL(location.href);
-      url.search = '';
-      if (replace) history.replaceState({}, '', url);
-      else history.pushState({}, '', url);
-      handleRoute();
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+        await signInAnonymously(auth);
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          state.uid = user.uid;
+          state.firebaseReady = true;
+          await loadSites({ openRoute: true });
+        });
+      } catch (error) {
+        console.error('Firebase initialization failed. Falling back to localStorage.', error);
+        state.firebaseReady = false;
+        await loadSites({ openRoute: true });
+      }
     }
 
     function getCookie(name) {
@@ -586,52 +451,98 @@
       return id;
     }
 
-    function isMine(site) {
-      return Boolean(
-        site &&
-        (
-          site.ownerUid === state.uid ||
-          site.creatorId === creatorId() ||
-          (Array.isArray(site.collaborators) && state.uid && site.collaborators.includes(state.uid))
-        )
-      );
-    }
-
-    function canRead(site) {
-      return Boolean(site?.isPublic || isMine(site));
-    }
-
     function slugify(value) {
-      const base = String(value || 'untitled')
+      return (value || 'untitled')
         .trim()
         .toLowerCase()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-      return base.slice(0, 48) || crypto.randomUUID().slice(0, 8);
+        .slice(0, 48) || crypto.randomUUID().slice(0, 8);
     }
 
-    function siteSlug(site) {
-      if (!site) return '';
-      if (site.urlMode === 'uuid') return site.siteId;
-      if (site.urlMode === 'custom' && site.customUrl) return site.customUrl;
-      return site.customUrl || slugify(site.title);
+    function canEditSite(site) {
+      const cookieMatch = site.creatorId && site.creatorId === creatorId();
+      const uidMatch = state.uid && site.ownerUid && site.ownerUid === state.uid;
+      const collaboratorMatch = state.uid && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid);
+      return Boolean(cookieMatch || uidMatch || collaboratorMatch);
     }
 
-    function buildSiteUrl(site, mode = 'view') {
-      const url = new URL(basePageUrl());
-      url.searchParams.set('site', siteSlug(site));
-      if (mode === 'edit' && site.key) url.searchParams.set('key', site.key);
-      return url.toString();
+    function canShowInList(site) {
+      return canEditSite(site);
     }
 
-    function renderFormattedText(raw = '') {
-      const escaped = escapeHtml(String(raw)).replace(/\n/g, '<br>');
-      const withColor = escaped.replace(/#([0-9a-fA-F]{6})([\s\S]*?)#\1/g, (_, color, inner) => {
-        return `<span style="color:#${color}">${inner}</span>`;
+    function normalizeSite(site) {
+      return {
+        siteId: site.siteId || crypto.randomUUID().slice(0, 8),
+        title: site.title || '無題のサイト',
+        ownerUid: site.ownerUid || state.uid || 'anonymous-local-user',
+        creatorId: site.creatorId || creatorId(),
+        customUrl: site.customUrl || '',
+        key: site.key || '',
+        isPublic: site.isPublic !== false,
+        collaborative: Boolean(site.key || site.collaborative),
+        collaborators: Array.isArray(site.collaborators) ? site.collaborators : [],
+        blocks: Array.isArray(site.blocks) && site.blocks.length ? site.blocks : [
+          { id: crypto.randomUUID(), type: 'text', html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'" }
+        ],
+        createdAt: site.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function makeSite() {
+      return normalizeSite({
+        siteId: crypto.randomUUID().slice(0, 8),
+        title: '無題のサイト',
+        ownerUid: state.uid || 'anonymous-local-user',
+        creatorId: creatorId(),
+        customUrl: '',
+        key: '',
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        blocks: [{ id: crypto.randomUUID(), type: 'text', html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'" }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
-      return withColor.replace(/B([\s\S]*?)B/g, '<strong>$1</strong>');
+    }
+
+    async function loadSites({ openRoute = true } = {}) {
+      if (state.firebaseReady && state.db) {
+        await loadSitesFromFirestore();
+      } else {
+        state.allSites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').map(normalizeSite);
+      }
+
+      state.sites = state.allSites.filter(canShowInList).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      renderSiteList();
+
+      if (openRoute) openRouteFromHash();
+    }
+
+    async function loadSitesFromFirestore() {
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      state.allSites = snapshot.docs.map((item) => normalizeSite({ siteId: item.id, ...item.data() }));
+    }
+
+    async function persistSites() {
+      if (state.firebaseReady && state.db && state.current) {
+        await saveSiteToFirestore(state.current);
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.allSites));
+    }
+
+    async function saveSiteToFirestore(site) {
+      const payload = {
+        ...site,
+        ownerUid: site.ownerUid || state.uid,
+        creatorId: site.creatorId || creatorId(),
+        collaborators: site.collaborators || [],
+        updatedAt: new Date().toISOString(),
+        updatedAtServer: serverTimestamp()
+      };
+      await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
     }
 
     function escapeHtml(value) {
@@ -644,93 +555,154 @@
       }[char]));
     }
 
-    function makeSite() {
-      const id = crypto.randomUUID().slice(0, 8);
-      return {
-        siteId: id,
-        title: '無題のサイト',
-        ownerUid: state.uid || 'anonymous-local-user',
-        creatorId: creatorId(),
-        urlMode: 'title',
-        customUrl: '',
-        key: '',
-        isPublic: true,
-        collaborative: false,
-        collaborators: [],
-        blocks: [
-          { id: crypto.randomUUID(), type: 'text', text: 'こんにちは\nB太字B\n#ff0000赤文字#ff0000' }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+    function sanitizeRichHtml(value) {
+      const template = document.createElement('template');
+      template.innerHTML = value;
+
+      template.content.querySelectorAll('*').forEach((node) => {
+        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(node.tagName)) {
+          node.replaceWith(...node.childNodes);
+          return;
+        }
+
+        if (node.tagName === 'SPAN') {
+          const color = node.style.color;
+          node.removeAttribute('style');
+          if (color) node.style.color = color;
+        } else {
+          [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+        }
+      });
+
+      return template.innerHTML;
     }
 
-    function showHome() {
-      state.current = null;
-      els.home.classList.remove('hidden');
-      els.viewer.classList.add('hidden');
-      els.editor.classList.add('hidden');
-      els.addBar.classList.add('hidden');
-      renderSiteList();
+    function renderFormattedBlock(block) {
+      const raw = block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>');
+      return sanitizeRichHtml(raw).replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    }
+
+    function basePageUrl() {
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    }
+
+    function shareBase(site = state.current) {
+      const path = site?.customUrl || site?.siteId || slugify(site?.title);
+      return `${basePageUrl()}#/${encodeURIComponent(path)}`;
+    }
+
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current?.key ? `${base}/${encodeURIComponent(state.current.key)}` : base;
+    }
+
+    function parseHashRoute() {
+      const hash = decodeURI(location.hash || '');
+      if (!hash.startsWith('#/')) return { sitePath: null, key: null };
+      const parts = hash.slice(2).split('/').filter(Boolean);
+      const sitePath = parts[0] ? decodeURIComponent(parts[0]) : null;
+      const key = parts[1] ? decodeURIComponent(parts[1]) : null;
+      return { sitePath, key };
+    }
+
+    function siteMatchesPath(site, path) {
+      if (!site || !path) return false;
+      const candidates = [
+        site.siteId,
+        site.customUrl,
+        site.title,
+        slugify(site.title)
+      ].filter(Boolean).map(String);
+      return candidates.includes(String(path));
+    }
+
+    function findSiteByPath(path) {
+      return state.allSites.find((site) => siteMatchesPath(site, path)) || null;
+    }
+
+    function openRouteFromHash() {
+      const { sitePath, key } = parseHashRoute();
+      state.routeSite = sitePath;
+      state.routeKey = key;
+
+      if (!sitePath) return;
+
+      const site = findSiteByPath(sitePath);
+      if (!site) {
+        showViewer({
+          title: 'サイトが見つかりません',
+          blocks: [{ id: 'not-found', type: 'text', html: 'このリンクのサイトはまだ読み込めていません。' }]
+        }, false);
+        return;
+      }
+
+      const isOwner = canEditSite(site);
+      if (key && site.key && key === site.key) {
+        openEditor(site);
+        return;
+      }
+
+      showViewer(site, isOwner);
     }
 
     function openEditor(site) {
-      state.current = structuredClone(site);
+      state.current = normalizeSite(structuredClone(site));
+      state.canEditCurrent = true;
       els.home.classList.add('hidden');
       els.viewer.classList.add('hidden');
       els.editor.classList.remove('hidden');
       els.addBar.classList.remove('hidden');
-      els.title.value = state.current.title || '';
-      els.urlMode.value = state.current.urlMode || 'title';
-      els.customUrl.value = state.current.customUrl || '';
+
+      els.title.value = state.current.title;
       els.key.value = state.current.key || '';
-      els.heading.textContent = state.current.title || '無題のサイト';
-      els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom');
+      els.customUrl.value = state.current.customUrl || '';
+      els.urlMode.value = state.current.customUrl && state.current.customUrl === state.current.siteId ? 'uuid'
+                        : state.current.customUrl && state.current.customUrl !== slugify(state.current.title) ? 'custom'
+                        : 'title';
+      els.heading.textContent = state.current.title;
+      els.urlMode.dispatchEvent(new Event('change'));
+
+      history.replaceState(null, '', shareBase(state.current));
       renderBlocks();
+      document.title = `${state.current.title} - CreateWebsite`;
     }
 
-    function showViewer(site) {
-      state.current = structuredClone(site);
+    function showViewer(site, canEdit) {
+      state.current = normalizeSite(structuredClone(site));
+      state.canEditCurrent = canEdit;
+
       els.home.classList.add('hidden');
       els.editor.classList.add('hidden');
       els.addBar.classList.add('hidden');
       els.viewer.classList.remove('hidden');
+
       els.viewerTitle.textContent = site.title || '無題のサイト';
-      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) => {
-        return `<article class="block"><div class="rendered-text">${renderFormattedText(block.text || '')}</div></article>`;
-      }).join('') || '<div class="empty">本文がありません。</div>';
-      $('#viewerEditBtn').classList.toggle('hidden', !isMine(site) && !(site.key && state.routeKey && site.key === state.routeKey));
-    }
+      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) =>
+        `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`
+      ).join('') || '<div class="empty">本文がありません。</div>';
 
-    function showNotFound(message = 'このサイトは見つかりませんでした。') {
-      state.current = null;
-      els.home.classList.add('hidden');
-      els.editor.classList.add('hidden');
-      els.addBar.classList.add('hidden');
-      els.viewer.classList.remove('hidden');
-      els.viewerTitle.textContent = 'サイトが見つかりません';
-      els.viewerCanvas.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
-      $('#viewerEditBtn').classList.add('hidden');
+      $('#viewerEditBtn').classList.toggle('hidden', !canEdit);
+      document.title = `${site.title || 'サイト'} - CreateWebsite`;
     }
 
     function renderSiteList() {
       if (!state.sites.length) {
-        els.siteList.innerHTML = `
-          <p class="empty">
-            まだサイトがありません。「新規作成」から始めましょう。<br>
-            ${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}
-          </p>`;
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
         return;
       }
 
       els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = isMine(site);
-        const handshake = site.collaborative && mine ? '🤝 ' : '';
+        const handshake = site.collaborative && canEditSite(site) ? '🤝 ' : '';
+        const canEdit = canEditSite(site);
         return `
-          <button class="site-card" data-site="${site.siteId}" type="button">
-            <strong>${handshake}${escapeHtml(site.title || '無題のサイト')}</strong>
-            <span>${escapeHtml(buildSiteUrl(site, 'view'))}</span>
-          </button>
+          <article class="site-card" data-site="${site.siteId}">
+            <strong>${handshake}${escapeHtml(site.title)}</strong>
+            <span>${escapeHtml(shareBase(site))}</span>
+            <div class="toolbar" style="margin-top:12px">
+              <button class="btn small" data-action="view" type="button">見る</button>
+              ${canEdit ? `<button class="btn small primary" data-action="edit" type="button">編集</button>` : ''}
+            </div>
+          </article>
         `;
       }).join('');
     }
@@ -752,70 +724,15 @@
               <button class="btn small danger" data-action="delete" type="button">削除</button>
             </div>
           </div>
-          <div class="rendered-text">${renderFormattedText(block.text || '')}</div>
+          <div class="rendered-text">${renderFormattedBlock(block)}</div>
         </article>
       `).join('');
-    }
-
-    async function loadSites() {
-      if (state.firebaseReady && state.db) {
-        await loadSitesFromFirestore();
-      } else {
-        state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      }
-      renderSiteList();
-      await handleRoute();
-    }
-
-    async function loadSitesFromFirestore() {
-      const snapshot = await getDocs(collection(state.db, 'websites'));
-      const allSites = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
-
-      state.sites = allSites
-        .filter((site) => isMine(site))
-        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-    }
-
-    async function loadSiteBySlug(slug) {
-      if (!slug) return null;
-
-      const fromLoaded = state.sites.find((site) => [site.siteId, site.customUrl, slugify(site.title)].includes(slug));
-      if (fromLoaded) return fromLoaded;
-
-      if (!state.firebaseReady || !state.db) {
-        const localSites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        return localSites.find((site) => [site.siteId, site.customUrl, slugify(site.title)].includes(slug)) || null;
-      }
-
-      const snapshot = await getDocs(collection(state.db, 'websites'));
-      const allSites = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
-      return allSites.find((site) => [site.siteId, site.customUrl, slugify(site.title)].includes(slug)) || null;
-    }
-
-    async function persistSites() {
-      if (state.firebaseReady && state.db && state.current) {
-        await saveSiteToFirestore(state.current);
-        return;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sites));
-    }
-
-    async function saveSiteToFirestore(site) {
-      const payload = {
-        ...site,
-        ownerUid: site.ownerUid || state.uid || 'anonymous-local-user',
-        creatorId: site.creatorId || creatorId(),
-        collaborators: site.collaborators || [],
-        updatedAt: new Date().toISOString(),
-        updatedAtServer: serverTimestamp()
-      };
-      await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
     }
 
     function openTextDialog(blockId = null) {
       state.editingBlockId = blockId;
       const block = state.current.blocks.find((item) => item.id === blockId);
-      els.textInput.value = block?.text || '';
+      els.textInput.innerHTML = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
       els.textDialog.showModal();
     }
 
@@ -823,132 +740,77 @@
       const url = currentShareUrl();
       els.shareUrl.textContent = url;
       els.qrBox.innerHTML = '生成中…';
+
       setTimeout(() => {
         els.qrBox.innerHTML = '';
-        if (window.QRCode) new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
-        else els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
+        if (window.QRCode) {
+          new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
+        } else {
+          els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
+        }
       }, 180);
-    }
-
-    function currentShareUrl() {
-      if (!state.current) return basePageUrl();
-      return state.shareMode === 'edit' && state.current.key
-        ? buildSiteUrl(state.current, 'edit')
-        : buildSiteUrl(state.current, 'view');
     }
 
     async function saveCurrent() {
       state.current.title = els.title.value.trim() || '無題のサイト';
-      state.current.urlMode = els.urlMode.value;
+      state.current.ownerUid = state.current.ownerUid || state.uid || 'anonymous-local-user';
+      state.current.creatorId = state.current.creatorId || creatorId();
       state.current.key = els.key.value.trim();
       state.current.collaborative = Boolean(state.current.key);
 
-      if (state.current.urlMode === 'uuid') {
-        state.current.customUrl = state.current.siteId;
-      } else if (state.current.urlMode === 'custom') {
-        state.current.customUrl = slugify(els.customUrl.value.trim());
-      } else {
-        state.current.customUrl = slugify(state.current.title);
+      if (!state.current.customUrl) {
+        if (els.urlMode.value === 'uuid') {
+          state.current.customUrl = state.current.siteId;
+        } else if (els.urlMode.value === 'custom') {
+          state.current.customUrl = slugify(els.customUrl.value);
+        } else {
+          state.current.customUrl = slugify(state.current.title);
+        }
       }
-
-      state.current.ownerUid = state.current.ownerUid === 'anonymous-local-user' && state.uid
-        ? state.uid
-        : state.current.ownerUid;
 
       state.current.updatedAt = new Date().toISOString();
 
-      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
-      if (index >= 0) state.sites[index] = structuredClone(state.current);
-      else state.sites.unshift(structuredClone(state.current));
+      const index = state.allSites.findIndex((site) => site.siteId === state.current.siteId);
+      if (index >= 0) state.allSites[index] = normalizeSite(structuredClone(state.current));
+      else state.allSites.unshift(normalizeSite(structuredClone(state.current)));
 
       await persistSites();
+
+      state.sites = state.allSites.filter(canShowInList).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       renderSiteList();
       renderBlocks();
-      setRoute(siteSlug(state.current), null, true);
+
+      history.replaceState(null, '', shareBase(state.current));
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
-    function openSiteFromRoute() {
-      const { site, key } = getRoute();
-      state.routeSite = site;
-      state.routeKey = key;
-      return { site, key };
+    function showHome({ keepHash = false } = {}) {
+      if (!keepHash) history.replaceState(null, '', location.pathname);
+      els.editor.classList.add('hidden');
+      els.viewer.classList.add('hidden');
+      els.addBar.classList.add('hidden');
+      els.home.classList.remove('hidden');
+      document.title = 'CreateWebsite';
     }
 
-    async function handleRoute() {
-      const { site, key } = openSiteFromRoute();
+    $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
 
-      if (!site) {
-        showHome();
-        return;
-      }
-
-      let target = state.sites.find((item) => [item.siteId, item.customUrl, slugify(item.title)].includes(site)) || null;
-      if (!target) target = await loadSiteBySlug(site);
-
-      if (!target) {
-        showNotFound('このリンクのサイトは見つかりませんでした。');
-        return;
-      }
-
-      if (key && target.key && key === target.key && isMine(target)) {
-        openEditor(target);
-        return;
-      }
-
-      if (!canRead(target)) {
-        showNotFound('このサイトは閲覧権限がありません。');
-        return;
-      }
-
-      showViewer(target);
-    }
-
-    async function initFirebase() {
-      if (!hasFirebaseConfig()) {
-        console.warn('Firebase config is empty. Using localStorage fallback.');
-        await loadSites();
-        return;
-      }
-
-      try {
-        const app = initializeApp(firebaseConfig);
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
-
-        await signInAnonymously(auth);
-
-        onAuthStateChanged(auth, async (user) => {
-          if (!user) return;
-          state.uid = user.uid;
-          state.firebaseReady = true;
-          await loadSites();
-        });
-      } catch (error) {
-        console.error('Firebase initialization failed. Falling back to localStorage.', error);
-        state.firebaseReady = false;
-        await loadSites();
-      }
-    }
-
-    $('#newSiteBtn').addEventListener('click', () => {
-      const site = makeSite();
-      openEditor(site);
+    $('#backBtn').addEventListener('click', async () => {
+      showHome();
+      await loadSites({ openRoute: false });
     });
 
-    $('#backBtn').addEventListener('click', () => {
-      clearRoute(true);
+    $('#viewerHomeBtn').addEventListener('click', async () => {
+      showHome();
+      await loadSites({ openRoute: false });
     });
 
-    $('#viewerHomeBtn').addEventListener('click', () => {
-      clearRoute(true);
-    });
-
-    $('#viewerEditBtn').addEventListener('click', async () => {
+    $('#viewerEditBtn').addEventListener('click', () => {
       if (state.current) openEditor(state.current);
     });
 
     $('#saveBtn').addEventListener('click', () => saveCurrent());
+
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
 
     $('#showIdBtn').addEventListener('click', () => {
@@ -960,19 +822,17 @@
       event.currentTarget.textContent = `ID: ${creatorId()}`;
     });
 
-    $('#copyIdBtn').addEventListener('click', async () => {
-      await navigator.clipboard?.writeText(creatorId());
-      alert('IDをコピーしました');
+    $('#copyIdBtn').addEventListener('click', () => {
+      navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました'));
     });
 
     $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
 
     $('#mergeIdBtn').addEventListener('click', () => {
-      confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('この画面では統合の流れだけ用意しています。');
+      confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('統合の流れだけ表示しています。');
     });
 
     els.title.addEventListener('input', () => {
-      if (!state.current) return;
       state.current.title = els.title.value;
       els.heading.textContent = state.current.title || '無題のサイト';
     });
@@ -980,68 +840,72 @@
     els.urlMode.addEventListener('change', () => {
       els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom');
     });
-
     els.urlMode.dispatchEvent(new Event('change'));
 
     $('#applyTextBtn').addEventListener('click', () => {
-      if (!state.current) return;
-      const text = els.textInput.value.trim() || '新しいテキスト';
-
+      const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
       if (state.editingBlockId) {
-        const block = state.current.blocks.find((item) => item.id === state.editingBlockId);
-        if (block) block.text = text;
+        const target = state.current.blocks.find((item) => item.id === state.editingBlockId);
+        if (target) target.html = html;
       } else {
-        state.current.blocks.push({
-          id: crypto.randomUUID(),
-          type: 'text',
-          text
-        });
+        state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       }
-
       renderBlocks();
     });
 
     els.siteList.addEventListener('click', (event) => {
+      const action = event.target.dataset.action;
       const card = event.target.closest('[data-site]');
       if (!card) return;
+
       const site = state.sites.find((item) => item.siteId === card.dataset.site);
-      if (site) setRoute(siteSlug(site), null, false);
+      if (!site) return;
+
+      if (action === 'edit') {
+        if (canEditSite(site)) openEditor(site);
+        return;
+      }
+
+      showViewer(site, canEditSite(site));
     });
 
     els.canvas.addEventListener('click', (event) => {
       const blockEl = event.target.closest('[data-block]');
       const action = event.target.dataset.action;
-      if (!blockEl || !action || !state.current) return;
+      if (!blockEl || !action) return;
 
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
       if (index < 0) return;
 
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
-      if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
-      if (action === 'delete' && confirm('このブロックを削除しますか？')) state.current.blocks.splice(index, 1);
+
+      if (action === 'copy') {
+        state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
+      }
+
+      if (action === 'delete' && confirm('このブロックを削除しますか？')) {
+        state.current.blocks.splice(index, 1);
+      }
+
       renderBlocks();
     });
 
     let dragId = null;
-
     els.canvas.addEventListener('dragstart', (event) => {
-      if (!event.target.matches('[data-block]')) return;
-      dragId = event.target.dataset.block;
-      event.target.classList.add('dragging');
+      const target = event.target.closest('[data-block]');
+      if (!target) return;
+      dragId = target.dataset.block;
+      target.classList.add('dragging');
     });
-
     els.canvas.addEventListener('dragend', (event) => {
-      if (event.target.matches('[data-block]')) event.target.classList.remove('dragging');
+      const target = event.target.closest('[data-block]');
+      if (target) target.classList.remove('dragging');
     });
-
     els.canvas.addEventListener('dragover', (event) => event.preventDefault());
-
     els.canvas.addEventListener('drop', (event) => {
       event.preventDefault();
-      if (!state.current || !dragId) return;
-
       const target = event.target.closest('[data-block]')?.dataset.block;
-      if (!target || dragId === target) return;
+      if (!dragId || !target || dragId === target) return;
 
       const from = state.current.blocks.findIndex((block) => block.id === dragId);
       const to = state.current.blocks.findIndex((block) => block.id === target);
@@ -1053,7 +917,6 @@
     });
 
     $('#shareBtn').addEventListener('click', () => {
-      if (!state.current) return;
       state.shareMode = 'view';
       document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
       els.shareDialog.showModal();
@@ -1062,15 +925,13 @@
 
     $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
 
-    $('#copyShareBtn').addEventListener('click', async () => {
-      await navigator.clipboard?.writeText(currentShareUrl());
-      alert('コピーしました');
+    $('#copyShareBtn').addEventListener('click', () => {
+      navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました'));
     });
 
-    $('#webShareBtn').addEventListener('click', async () => {
-      const url = currentShareUrl();
+    $('#webShareBtn').addEventListener('click', () => {
       if (navigator.share) {
-        await navigator.share({ title: state.current?.title || 'CreateWebsite', url });
+        navigator.share({ title: state.current.title, url: currentShareUrl() });
       } else {
         alert('このブラウザはWeb Share APIに対応していません。');
       }
@@ -1083,10 +944,11 @@
       updateQr();
     });
 
-    window.addEventListener('popstate', handleRoute);
+    window.addEventListener('hashchange', () => openRouteFromHash());
 
     creatorId();
     initFirebase();
+
   </script>
 </body>
 </html>
