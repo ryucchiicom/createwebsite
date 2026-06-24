@@ -7,148 +7,1029 @@
   <meta name="description" content="メモアプリ感覚でWebサイトを作って公開できるサービス" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <style>
-    :root {
-      color-scheme: light;
-      --bg: #f6f7fb;
-      --card: rgba(255, 255, 255, 0.92);
-      --ink: #1c2430;
-      --muted: #667085;
-      --line: #e4e7ec;
-      --brand: #5f63f2;
-      --brand-dark: #494de4;
-      --accent: #18a999;
-      --danger: #ef4444;
-      --shadow: 0 18px 50px rgba(28, 36, 48, 0.12);
-      --radius: 22px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    :root{
+      --bg1:#f8faff;
+      --bg2:#eef2f8;
+      --panel:#fff;
+      --line:#d8dbe5;
+      --text:#1f2430;
+      --muted:#6b7280;
+      --accent:#2f6fed;
+      --good:#118a3a;
+      --bad:#d33c3c;
+      --radius:18px;
+      --shadow:0 12px 30px rgba(20,25,40,.08);
+      --ownerBg:rgba(47,111,237,.08);
+      --ownerLine:rgba(47,111,237,.42);
+      --editorBg:rgba(58,168,255,.08);
+      --editorLine:rgba(58,168,255,.42);
     }
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(95, 99, 242, 0.18), transparent 34rem),
-        radial-gradient(circle at 100% 10%, rgba(24, 169, 153, 0.15), transparent 28rem),
-        var(--bg);
-      color: var(--ink);
+    body.dark{
+      --bg1:#0b1120;
+      --bg2:#111827;
+      --panel:#111827;
+      --line:#243043;
+      --text:#e7ecf7;
+      --muted:#9aa4b2;
+      --accent:#5b8cff;
+      --good:#39c66d;
+      --bad:#ff7676;
+      --shadow:0 12px 30px rgba(0,0,0,.26);
+      --ownerBg:rgba(91,140,255,.12);
+      --ownerLine:rgba(91,140,255,.45);
+      --editorBg:rgba(58,168,255,.12);
+      --editorLine:rgba(88,189,255,.45);
     }
 
-    button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; border: 0; }
-    textarea { resize: vertical; }
-    .app-shell { width: min(1120px, 100%); margin: 0 auto; padding: 20px 16px 112px; }
-    .hidden { display: none !important; }
+    html, body{ overflow-x:auto; }
+    *{ box-sizing:border-box; }
 
-    .hero {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 18px;
-      align-items: stretch;
-      margin: 12px 0 20px;
-    }
-    .panel {
-      background: var(--card);
-      border: 1px solid rgba(255, 255, 255, 0.74);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 22px;
-      backdrop-filter: blur(14px);
-    }
-    .eyebrow { color: var(--brand); font-weight: 800; letter-spacing: .08em; font-size: 0.78rem; }
-    h1, h2, h3 { margin: 0; line-height: 1.15; }
-    h1 { font-size: clamp(2rem, 7vw, 4.5rem); letter-spacing: -0.06em; margin-top: 8px; }
-    h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
-    p { color: var(--muted); line-height: 1.8; }
-    .hero-actions, .toolbar, .row, .tabs { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .btn {
-      min-height: 44px;
-      border-radius: 999px;
-      padding: 0 18px;
-      font-weight: 800;
-      background: #fff;
-      color: var(--ink);
-      box-shadow: inset 0 0 0 1px var(--line);
-    }
-    .btn.primary { background: var(--brand); color: #fff; box-shadow: 0 10px 24px rgba(95, 99, 242, .28); }
-    .btn.primary:hover { background: var(--brand-dark); }
-    .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
-    .btn.ghost { background: transparent; }
-    .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
-
-    .site-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 16px; }
-    .site-card {
-      text-align: left;
-      width: 100%;
-      border-radius: 20px;
-      padding: 16px;
-      background: #fff;
-      border: 1px solid var(--line);
-      transition: transform .15s, box-shadow .15s;
-    }
-    .site-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(28, 36, 48, .1); }
-    .site-card strong { display: block; font-size: 1.08rem; margin-bottom: 8px; }
-    .site-card span { color: var(--muted); font-size: .9rem; word-break: break-all; }
-
-    .editor-layout { display: grid; gap: 16px; align-items: start; }
-    .editor-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
-    .field { display: grid; gap: 7px; margin: 12px 0; }
-    .field label { font-weight: 800; font-size: .92rem; }
-    .field input, .field textarea, .field select {
-      width: 100%; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: #fff; color: var(--ink);
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+      background:linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      min-height:100vh;
     }
 
-    .canvas { min-height: 52vh; padding: 18px; background: rgba(255,255,255,.58); border: 1px dashed #cdd3df; border-radius: var(--radius); }
-    .empty { text-align: center; padding: 60px 14px; color: var(--muted); white-space: pre-wrap; line-height: 1.8; }
-    .block {
-      background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px;
-      touch-action: manipulation;
+    button,input,textarea,select{ font:inherit; }
+    button{
+      border:none;
+      border-radius:14px;
+      padding:12px 16px;
+      cursor:pointer;
     }
-    .block.dragging { opacity: .6; outline: 3px solid rgba(95,99,242,.25); }
-    .block-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .grab { color: var(--muted); font-weight: 900; user-select: none; }
-    .rendered-text { white-space: pre-wrap; line-height: 1.8; word-break: break-word; }
-    .rich-editor { min-height: 180px; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: #fff; line-height: 1.8; outline: none; }
-    .rich-editor:focus { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(95,99,242,.12); }
 
-    .bottom-add-bar {
-      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 28px));
-      display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 12px;
-      background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); z-index: 30;
+    .hide{ display:none !important; }
+    .page{ max-width:980px; margin:0 auto; padding:16px; min-height:100vh; }
+
+    .titleArea{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      min-width:0;
     }
-    .bottom-add-bar span { color: var(--muted); font-weight: 700; padding-left: 12px; }
+    .titleBlock{ min-width:0; }
 
-    dialog { width: min(620px, calc(100% - 24px)); border: 0; border-radius: 26px; padding: 0; box-shadow: var(--shadow); }
-    dialog::backdrop { background: rgba(15, 23, 42, .42); backdrop-filter: blur(4px); }
-    .dialog-body { padding: 22px; }
-    .qr-box { width: 220px; height: 220px; display: grid; place-items: center; margin: 10px auto 16px; border-radius: 20px; background: #f2f4f7; color: var(--muted); overflow: hidden; }
-    .share-url { word-break: break-all; background: #f8fafc; border: 1px solid var(--line); border-radius: 16px; padding: 12px; line-height: 1.7; }
-    .tab { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font-weight: 800; }
-    .tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
-    .id-pill { display: inline-flex; gap: 8px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; }
-    .notice { background: #eef2ff; color: #3730a3; border-radius: 16px; padding: 12px; line-height: 1.7; }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      position:sticky;
+      top:0;
+      padding:8px 0 12px;
+      backdrop-filter:blur(8px);
+      z-index:5;
+    }
 
-    @media (max-width: 820px) {
-      .hero, .editor-layout { grid-template-columns: 1fr; }
-      .editor-top { align-items: stretch; flex-direction: column; }
-      .toolbar .btn { flex: 1; }
-      .bottom-add-bar { border-radius: 24px; align-items: stretch; flex-direction: column; }
-      .bottom-add-bar span { padding-left: 0; text-align: center; }
+    .title{
+      font-size:28px;
+      font-weight:900;
+      line-height:1.1;
+      margin:0;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.6;
+    }
+
+    .card{
+      background:var(--panel);
+      border:1px solid rgba(15,23,42,.08);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+    }
+
+    .hero{
+      max-width:860px;
+      margin:36px auto 0;
+      display:grid;
+      gap:16px;
+    }
+
+    .bigBtn,.primary{
+      background:var(--accent);
+      color:#fff;
+      font-weight:800;
+    }
+
+    .ghost{
+      background:#eef3ff;
+      color:#244a9c;
+      border:1px solid #d7e2ff;
+      font-weight:700;
+    }
+
+    body.dark .ghost{
+      background:#182133;
+      color:#d7e5ff;
+      border-color:#2d3a4f;
+    }
+
+    .danger{
+      background:#ffeded;
+      color:#a72b2b;
+      border:1px solid #ffc7c7;
+      font-weight:800;
+    }
+
+    body.dark .danger{
+      background:#2a1620;
+      color:#ffaaaa;
+      border-color:#5b2a39;
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .input{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px 15px;
+      outline:none;
+      background:var(--panel);
+      color:var(--text);
+    }
+
+    .input:focus{
+      border-color:#9ab8ff;
+      box-shadow:0 0 0 4px rgba(47,111,237,.08);
+    }
+
+    .label{
+      font-size:12px;
+      color:var(--muted);
+      font-weight:700;
+      margin-bottom:6px;
+    }
+
+    .gridEditor{
+      display:grid;
+      grid-template-columns:64px 1fr;
+      border:1px solid var(--line);
+      border-radius:18px;
+      overflow:hidden;
+      min-height:420px;
+      background:var(--panel);
+      align-items:stretch;
+    }
+
+    .gutter{
+      background:rgba(127,127,127,.07);
+      border-right:1px solid var(--line);
+      padding:14px 8px 14px 0;
+      text-align:right;
+      color:#8a93a8;
+      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      white-space:pre;
+      user-select:none;
+      overflow:hidden;
+      align-self:stretch;
+      min-height:420px;
+    }
+
+    .editorTextWrap{
+      position:relative;
+      min-height:420px;
+      overflow:hidden;
+      background:var(--panel);
+    }
+
+    .editorMirror{
+      position:absolute;
+      inset:0;
+      padding:14px;
+      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      white-space:pre;
+      overflow:auto;
+      color:var(--text);
+      pointer-events:none;
+      z-index:1;
+      scrollbar-gutter:stable;
+    }
+
+    .editorMirror .memoText{
+      color:#98a0af;
+    }
+    body.dark .editorMirror .memoText{
+      color:#7e8798;
+    }
+
+    .textarea{
+      position:relative;
+      z-index:2;
+      width:100%;
+      border:none;
+      outline:none;
+      resize:none;
+      min-height:420px;
+      padding:14px;
+      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      white-space:pre;
+      overflow:auto;
+      touch-action:pan-x pan-y;
+      tab-size:2;
+      background:transparent;
+      color:transparent;
+      caret-color:var(--text);
+      scrollbar-gutter:stable;
+    }
+
+    .help,.note{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.8;
+    }
+
+    .quiz{
+      max-width:860px;
+      margin:20px auto 0;
+      display:grid;
+      gap:14px;
+    }
+
+    .progress{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:700;
+    }
+
+    .sectionText{
+      font-size:18px;
+      font-weight:900;
+      line-height:1.35;
+      color:#334155;
+      word-break:break-word;
+      white-space:normal;
+    }
+    body.dark .sectionText{ color:#d7def0; }
+
+    .question{
+      font-size:clamp(22px,4vw,32px);
+      font-weight:900;
+      line-height:1.4;
+      word-break:break-word;
+      white-space:normal;
+    }
+
+    .answer{
+      width:100%;
+      font-size:18px;
+      padding:16px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      outline:none;
+      background:var(--panel);
+      color:var(--text);
+    }
+
+    .answerFields{
+      display:grid;
+      gap:10px;
+      grid-template-columns:1fr;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      align-items:center;
+    }
+
+    .submit{
+      background:var(--accent);
+      color:#fff;
+      font-weight:900;
+      padding:14px 20px;
+      border-radius:16px;
+      min-width:116px;
+    }
+
+    .next{
+      background:#1c9c59;
+      color:#fff;
+      font-weight:900;
+      padding:14px 20px;
+      border-radius:16px;
+      min-width:116px;
+    }
+
+    .good{
+      border:1px solid rgba(47,111,237,.22);
+      background:#eef4ff;
+      color:var(--accent);
+      padding:14px 16px;
+      border-radius:16px;
+      font-weight:900;
+      font-size:18px;
+    }
+    body.dark .good{
+      border-color:rgba(91,140,255,.35);
+      background:#13264a;
+      color:#9ebdff;
+    }
+
+    .bad{
+      border:1px solid rgba(211,60,60,.22);
+      background:#fff3f3;
+      color:var(--bad);
+      padding:14px 16px;
+      border-radius:16px;
+      font-weight:900;
+      font-size:18px;
+    }
+
+    .explain{
+      background:#f8faff;
+      border:1px solid #dbe4fb;
+      padding:14px 16px;
+      border-radius:16px;
+      line-height:1.8;
+      word-break:break-word;
+      color:#2b3241;
+    }
+    body.dark .explain{
+      background:#182133;
+      border-color:#2d3a4f;
+      color:#e7ecf7;
+    }
+
+    .summary{
+      max-width:860px;
+      margin:20px auto 0;
+      display:grid;
+      gap:14px;
+    }
+
+    .score{
+      font-size:28px;
+      font-weight:1000;
+      line-height:1.2;
+    }
+
+    .reviewList{
+      display:grid;
+      gap:10px;
+    }
+
+    .reviewItem{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px 15px;
+      background:var(--panel);
+      display:grid;
+      gap:6px;
+    }
+
+    .reviewItem.reviewGood{
+      border-color:rgba(47,111,237,.35);
+      background:rgba(47,111,237,.06);
+    }
+
+    .reviewItem.reviewBad{
+      border-color:rgba(211,60,60,.35);
+      background:rgba(211,60,60,.06);
+    }
+
+    body.dark .reviewItem.reviewGood{
+      border-color:rgba(91,140,255,.40);
+      background:rgba(91,140,255,.10);
+    }
+    body.dark .reviewItem.reviewBad{
+      border-color:rgba(255,118,118,.35);
+      background:rgba(255,118,118,.08);
+    }
+
+    .reviewSection{
+      font-size:15px;
+      font-weight:900;
+      color:#334155;
+      line-height:1.4;
+    }
+    body.dark .reviewSection{ color:#d7def0; }
+
+    .reviewQ{
+      font-weight:900;
+      font-size:16px;
+      word-break:break-word;
+    }
+
+    .reviewA{
+      font-size:14px;
+      color:var(--muted);
+      line-height:1.6;
+      word-break:break-word;
+    }
+
+    .listGrid{
+      display:grid;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .listItem{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:var(--panel);
+      box-shadow:var(--shadow);
+      padding:14px 15px;
+    }
+
+    .listMeta{
+      min-width:0;
+      display:grid;
+      gap:4px;
+      flex:1;
+    }
+
+    .listActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .miniAction{
+      padding:10px 12px;
+      font-size:13px;
+      border-radius:12px;
+      white-space:nowrap;
+    }
+
+    .metaLine{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.6;
+      word-break:break-word;
+    }
+
+    .choiceGrid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    }
+
+    .choiceBtn{
+      text-align:center;
+      width:100%;
+    }
+
+    .choiceBtn.selected{
+      background:#dfe9ff !important;
+      border-color:#9ab8ff !important;
+      box-shadow:0 0 0 4px rgba(47,111,237,.08);
+      color:#173a88 !important;
+    }
+    body.dark .choiceBtn.selected{
+      background:#31445f !important;
+      border-color:#6b92ff !important;
+      box-shadow:0 0 0 4px rgba(91,140,255,.15);
+      color:#f3f7ff !important;
+    }
+
+    .homeControls{
+      display:grid;
+      gap:10px;
+    }
+
+    .homeTopRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .searchWrap{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex:1;
+      min-width:220px;
+    }
+
+    .searchInput{
+      flex:1;
+      height:48px;
+    }
+
+    .homeSectionTitle{
+      font-size:16px;
+      font-weight:900;
+      margin:0 0 10px;
+      color:var(--text);
+    }
+
+    .dividerLine{
+      text-align:center;
+      color:var(--muted);
+      font-weight:900;
+      margin:10px 0 6px;
+      user-select:none;
+    }
+
+    .publicBadge{
+      font-size:12px;
+      font-weight:900;
+      color:var(--accent);
+      border:1px solid rgba(47,111,237,.2);
+      background:rgba(47,111,237,.08);
+      padding:4px 8px;
+      border-radius:999px;
+      white-space:nowrap;
+    }
+
+    body.dark .publicBadge{
+      color:#a9c0ff;
+      border-color:rgba(91,140,255,.28);
+      background:rgba(91,140,255,.10);
+    }
+
+    .homeMeta{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .settingList{
+      display:grid;
+      gap:10px;
+    }
+
+    .settingRow{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      width:100%;
+      text-align:left;
+      padding:16px;
+      border-radius:18px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      box-shadow:var(--shadow);
+      color:var(--text);
+    }
+
+    .settingText{
+      display:grid;
+      gap:4px;
+      min-width:0;
+      flex:1;
+    }
+
+    .settingLabel{
+      font-size:16px;
+      font-weight:900;
+      line-height:1.2;
+    }
+
+    .settingHint{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+
+    .toggleSwitch{
+      position:relative;
+      width:58px;
+      height:34px;
+      border-radius:999px;
+      background:#c8d0df;
+      transition:.2s background;
+      flex:none;
+    }
+
+    body.dark .toggleSwitch{
+      background:#42506a;
+    }
+
+    .toggleSwitch.on{
+      background:var(--accent);
+    }
+
+    .toggleKnob{
+      position:absolute;
+      top:3px;
+      left:3px;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 4px 10px rgba(0,0,0,.15);
+      transition:.2s transform;
+    }
+
+    .toggleSwitch.on .toggleKnob{
+      transform:translateX(24px);
+    }
+
+    .settingHeader{
+      display:grid;
+      gap:8px;
+    }
+
+    .settingTitle{
+      font-size:26px;
+      font-weight:1000;
+      line-height:1.1;
+      margin:0;
+    }
+
+    .settingSub{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.6;
+    }
+
+    .bottom-add-bar{
+      position:fixed;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      width:min(760px, calc(100% - 28px));
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:12px;
+      background:rgba(255,255,255,.94);
+      border:1px solid var(--line);
+      border-radius:999px;
+      box-shadow:var(--shadow);
+      z-index:30;
+    }
+
+    body.dark .bottom-add-bar{
+      background:rgba(17,24,39,.94);
+    }
+
+    .bottom-add-bar span{
+      color:var(--muted);
+      font-weight:700;
+      padding-left:12px;
+    }
+
+    dialog{
+      width:min(620px, calc(100% - 24px));
+      border:0;
+      border-radius:26px;
+      padding:0;
+      box-shadow:var(--shadow);
+    }
+
+    dialog::backdrop{
+      background:rgba(15,23,42,.42);
+      backdrop-filter:blur(4px);
+    }
+
+    .dialog-body{ padding:22px; }
+
+    .qr-box{
+      width:220px;
+      height:220px;
+      display:grid;
+      place-items:center;
+      margin:10px auto 16px;
+      border-radius:20px;
+      background:#f2f4f7;
+      color:var(--muted);
+      overflow:hidden;
+    }
+
+    .share-url{
+      word-break:break-all;
+      background:#f8fafc;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+      line-height:1.7;
+    }
+
+    .tab{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:9px 14px;
+      font-weight:800;
+    }
+
+    .tab.active{
+      color:#fff;
+      background:var(--accent);
+      border-color:var(--accent);
+    }
+
+    .id-pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:8px 12px;
+    }
+
+    .notice{
+      background:#eef2ff;
+      color:#3730a3;
+      border-radius:16px;
+      padding:12px;
+      line-height:1.7;
+    }
+
+    .notFoundBox{
+      padding:18px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      line-height:1.8;
+      word-break:break-word;
+      color:var(--text);
+    }
+
+    .rich-editor{
+      min-height:180px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      line-height:1.8;
+      outline:none;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    .rich-editor:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 4px rgba(47,111,237,.12);
+    }
+
+    .block{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+      margin-bottom:12px;
+      touch-action:manipulation;
+    }
+
+    .block.dragging{
+      opacity:.6;
+      outline:3px solid rgba(95,99,242,.25);
+    }
+
+    .block-head{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+      margin-bottom:8px;
+    }
+
+    .grab{
+      color:var(--muted);
+      font-weight:900;
+      user-select:none;
+    }
+
+    .rendered-text{
+      white-space:pre-wrap;
+      line-height:1.8;
+      word-break:break-word;
+    }
+
+    .toolbar,.hero-actions,.tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .btn{
+      min-height:44px;
+      border-radius:999px;
+      padding:0 18px;
+      font-weight:800;
+      background:#fff;
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--line);
+    }
+
+    .btn.primary{
+      background:var(--accent);
+      color:#fff;
+      box-shadow:0 10px 24px rgba(95,99,242,.28);
+    }
+
+    .btn.danger{
+      color:#fff;
+      background:var(--bad);
+      box-shadow:none;
+    }
+
+    .btn.ghost{ background:transparent; }
+    .btn.small{ min-height:36px; padding:0 12px; font-size:.9rem; }
+
+    .empty{
+      text-align:center;
+      padding:60px 14px;
+      color:var(--muted);
+      white-space:pre-wrap;
+      line-height:1.8;
+    }
+
+    .site-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+      gap:14px;
+      margin-top:16px;
+    }
+
+    .site-card{
+      text-align:left;
+      width:100%;
+      border-radius:20px;
+      padding:16px;
+      background:#fff;
+      border:1px solid var(--line);
+      transition:transform .15s, box-shadow .15s;
+    }
+
+    .site-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 14px 30px rgba(28,36,48,.1);
+    }
+
+    .site-card strong{
+      display:block;
+      font-size:1.08rem;
+      margin-bottom:8px;
+    }
+
+    .site-card span{
+      color:var(--muted);
+      font-size:.9rem;
+      word-break:break-all;
+    }
+
+    .hero{
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:18px;
+      align-items:stretch;
+      margin:12px 0 20px;
+    }
+
+    .panel{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.74);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+      backdrop-filter:blur(14px);
+    }
+
+    .eyebrow{
+      color:var(--accent);
+      font-weight:800;
+      letter-spacing:.08em;
+      font-size:.78rem;
+    }
+
+    h1,h2,h3{ margin:0; line-height:1.15; }
+    h1{ font-size:clamp(2rem,7vw,4.5rem); letter-spacing:-.06em; margin-top:8px; }
+    h2{ font-size:clamp(1.35rem,4vw,2.1rem); }
+    p{ color:var(--muted); line-height:1.8; }
+
+    .editor-layout{
+      display:grid;
+      gap:16px;
+      align-items:start;
+    }
+
+    .editor-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:12px;
+    }
+
+    .field{
+      display:grid;
+      gap:7px;
+      margin:12px 0;
+    }
+
+    .field label{
+      font-weight:800;
+      font-size:.92rem;
+    }
+
+    .field input,.field textarea,.field select{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      color:var(--text);
+    }
+
+    .canvas{
+      min-height:52vh;
+      padding:18px;
+      background:rgba(255,255,255,.58);
+      border:1px dashed #cdd3df;
+      border-radius:var(--radius);
+    }
+
+    .viewerLayout{
+      display:grid;
+      gap:12px;
+    }
+
+    @media (max-width: 820px){
+      .hero,.editor-layout{ grid-template-columns:1fr; }
+      .editor-top{
+        align-items:stretch;
+        flex-direction:column;
+      }
+      .toolbar .btn{ flex:1; }
+      .bottom-add-bar{
+        border-radius:24px;
+        align-items:stretch;
+        flex-direction:column;
+      }
+      .bottom-add-bar span{
+        padding-left:0;
+        text-align:center;
+      }
+    }
+
+    @media (max-width:640px){
+      .page{ padding:14px; }
+      .title{ font-size:22px; }
+      .gridEditor{ grid-template-columns:52px 1fr; min-height:380px; }
+      .question{ font-size:22px; }
+      .answer{ font-size:16px; }
+      .bigBtn{ width:100%; }
+      .actions{ justify-content:stretch; }
+      .actions button{ flex:1; }
+      .topbar{ align-items:flex-start; }
+      .listItem{ align-items:flex-start; flex-direction:column; }
+      .listActions{ justify-content:flex-start; }
     }
   </style>
 </head>
 <body>
-  <main class="app-shell">
+  <main class="page">
     <section id="homeView">
+      <div class="topbar">
+        <div class="titleArea">
+          <div class="titleBlock">
+            <h1 class="title">CreateWebsite</h1>
+            <div class="sub">メモを書くように、サイトを作ろう。</div>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="showIdBtn">自分のID</button>
+          <button class="btn primary" id="newSiteBtn">＋ 新規作成</button>
+        </div>
+      </div>
+
       <div class="hero">
         <div class="panel">
           <div class="eyebrow">CreateWebsite</div>
-          <h1>メモを書くように、サイトを作ろう。</h1>
-          <p>HTML、GitHub、Firebaseを知らなくても大丈夫。テキストブロックを追加して保存するだけで、共有できるWebページを作れます。</p>
+          <h1>HTMLを知らなくても、サイトは作れる。</h1>
+          <p>テキストブロックを追加して保存するだけ。URLはタイトル、UUID、カスタムから選べます。共同編集もできます。</p>
           <div class="hero-actions">
-            <button class="btn primary" id="newSiteBtn">＋ 新規作成</button>
-            <button class="btn" id="showIdBtn">自分のIDを見る</button>
+            <button class="btn primary" id="newSiteBtn2">＋ 新規作成</button>
+            <button class="btn" id="showIdBtn2">自分のIDを見る</button>
           </div>
         </div>
         <div class="panel">
@@ -159,22 +1040,22 @@
       </div>
     </section>
 
-    <section id="viewerView" class="hidden">
+    <section id="viewerView" class="hide">
       <div class="panel">
         <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
-        <h2 id="viewerTitle">サイト</h2>
-        <div class="canvas" id="viewerCanvas" style="margin-top:14px"></div>
+        <h2 id="viewerTitle" style="margin-top:10px">サイト</h2>
+        <div class="canvas viewerLayout" id="viewerCanvas" style="margin-top:14px"></div>
         <div class="toolbar" style="margin-top:14px">
           <button class="btn primary" id="viewerEditBtn">編集する</button>
         </div>
       </div>
     </section>
 
-    <section id="editorView" class="hidden">
+    <section id="editorView" class="hide">
       <div class="editor-top">
         <div>
           <button class="btn ghost" id="backBtn">← 一覧へ</button>
-          <h2 id="editorHeading">無題のサイト</h2>
+          <h2 id="editorHeading" style="margin-top:10px">無題のサイト</h2>
         </div>
         <div class="toolbar">
           <button class="btn" id="shareBtn">共有</button>
@@ -215,7 +1096,7 @@
     </section>
   </main>
 
-  <div class="bottom-add-bar hidden" id="addBar">
+  <div class="bottom-add-bar hide" id="addBar">
     <span>下からブロックを追加できます</span>
     <button class="btn primary" id="addTextBtn">＋ 追加</button>
   </div>
@@ -223,7 +1104,7 @@
   <dialog id="textDialog">
     <form method="dialog" class="dialog-body">
       <h2>テキストブロック</h2>
-      <p>太字はPCなら Ctrl+B、スマホなら文字選択後の標準フォーマット機能で変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
+      <p>太字は <code>B太字B</code>、色は <code>#ff0000赤文字#ff0000</code> の形で使えます。</p>
       <div class="field">
         <label for="textInput">本文</label>
         <div id="textInput" class="rich-editor" contenteditable="true"></div>
@@ -268,26 +1149,15 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import {
-      getFirestore,
-      collection,
-      doc,
-      getDoc,
-      getDocs,
-      query,
-      where,
-      setDoc,
-      serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const firebaseConfig = {
-      apiKey: "AIzaSyCYRh2cUMa4ecUmU9tpOT_ExrZcsYdVyHI",
-      authDomain: "createwebsite-274dd.firebaseapp.com",
-      projectId: "createwebsite-274dd",
-      storageBucket: "createwebsite-274dd.firebasestorage.app",
-      messagingSenderId: "646970295160",
-      appId: "1:646970295160:web:a3f9b6f07c067a1782be8d",
-      measurementId: "G-RN71HFCTGL"
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: ''
     };
 
     const STORAGE_KEY = 'createwebsite:sites:v1';
@@ -406,37 +1276,23 @@
     }
 
     function clearViews() {
-      els.home.classList.add('hidden');
-      els.viewer.classList.add('hidden');
-      els.editor.classList.add('hidden');
-      els.addBar.classList.add('hidden');
+      els.home.classList.add('hide');
+      els.viewer.classList.add('hide');
+      els.editor.classList.add('hide');
+      els.addBar.classList.add('hide');
     }
 
     function showHome() {
       clearViews();
-      els.home.classList.remove('hidden');
-      state.current = null;
+      els.home.classList.remove('hide');
       history.replaceState(null, '', location.pathname);
     }
 
-    function upsertSiteCache(site) {
-      if (!site || !site.siteId) return;
-      const idx = state.sites.findIndex((item) => item.siteId === site.siteId);
-      if (idx >= 0) state.sites[idx] = structuredClone(site);
-      else state.sites.unshift(structuredClone(site));
-    }
-
-    function removeSiteCache(siteId) {
-      state.sites = state.sites.filter((site) => site.siteId !== siteId);
-    }
-
     function openEditor(site) {
-      if (!site) return;
       state.current = structuredClone(site);
-      upsertSiteCache(site);
       clearViews();
-      els.editor.classList.remove('hidden');
-      els.addBar.classList.remove('hidden');
+      els.editor.classList.remove('hide');
+      els.addBar.classList.remove('hide');
       els.title.value = state.current.title || '';
       els.key.value = state.current.key || '';
       els.customUrl.value = state.current.customUrl || '';
@@ -444,27 +1300,25 @@
       renderBlocks();
     }
 
-    function renderSiteList() {
-      const mySites = state.sites.filter((site) => {
-        const mineByCreator = site.creatorId === creatorId();
-        const mineByAuth = state.uid && site.ownerUid === state.uid;
-        const mineByCollab = state.uid && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid);
-        return mineByCreator || mineByAuth || mineByCollab;
-      });
+    function showNotFound(fullUrl) {
+      clearViews();
+      els.viewer.classList.remove('hide');
+      els.viewerTitle.textContent = 'サイトが見つかりません';
+      els.viewerCanvas.innerHTML = `<div class="notFoundBox">このリンクのサイトがまだ読み込めていません。<br>URL: ${escapeHtml(fullUrl)}</div>`;
+      $('#viewerEditBtn').classList.add('hide');
+    }
 
-      if (!mySites.length) {
-        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
-        return;
-      }
-
-      els.siteList.innerHTML = mySites.map((site) => {
-        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
-        const handshake = site.collaborative && mine ? '🤝 ' : '';
-        return `<button class="site-card" data-site="${site.siteId}">
-          <strong>${handshake}${escapeHtml(site.title)}</strong>
-          <span>${escapeHtml(shareBase(site))}</span>
-        </button>`;
-      }).join('');
+    function showViewer(site, canEdit) {
+      state.current = structuredClone(site);
+      clearViews();
+      els.viewer.classList.remove('hide');
+      els.viewerTitle.textContent = site.title || '無題のサイト';
+      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) => `
+        <article class="block">
+          <div class="rendered-text">${renderFormattedBlock(block)}</div>
+        </article>
+      `).join('') || '<div class="empty">本文がありません。</div>';
+      $('#viewerEditBtn').classList.toggle('hide', !canEdit);
     }
 
     function sanitizeRichHtml(value) {
@@ -497,6 +1351,39 @@
         .replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
     }
 
+    function shareBase(site = state.current) {
+      const path = site.customUrl || site.siteId || slugify(site.title);
+      return `${basePageUrl()}#/${path}`;
+    }
+
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
+    }
+
+    function renderSiteList() {
+      const mySites = state.sites.filter((site) => {
+        const mineByCreator = site.creatorId === creatorId();
+        const mineByAuth = state.uid && site.ownerUid === state.uid;
+        const mineByCollab = state.uid && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid);
+        return mineByCreator || mineByAuth || mineByCollab;
+      });
+
+      if (!mySites.length) {
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
+        return;
+      }
+
+      els.siteList.innerHTML = mySites.map((site) => {
+        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
+        const handshake = site.collaborative && mine ? '🤝 ' : '';
+        return `<button class="site-card" data-site="${site.siteId}">
+          <strong>${handshake}${escapeHtml(site.title)}</strong>
+          <span>${escapeHtml(shareBase(site))}</span>
+        </button>`;
+      }).join('');
+    }
+
     function renderBlocks() {
       els.heading.textContent = state.current.title || '無題のサイト';
       if (!state.current.blocks.length) {
@@ -517,38 +1404,6 @@
           <div class="rendered-text">${renderFormattedBlock(block)}</div>
         </article>
       `).join('');
-    }
-
-    function shareBase(site = state.current) {
-      const path = site?.customUrl || site?.siteId || slugify(site?.title);
-      return `${basePageUrl()}#/${path}`;
-    }
-
-    function currentShareUrl() {
-      const base = shareBase();
-      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
-    }
-
-    function showNotFound(fullUrl) {
-      clearViews();
-      els.viewer.classList.remove('hidden');
-      els.viewerTitle.textContent = 'サイトが見つかりません';
-      els.viewerCanvas.innerHTML = `<div class="empty">このリンクのサイトがまだ読み込めていません。<br>URL: ${escapeHtml(fullUrl)}</div>`;
-      $('#viewerEditBtn').classList.add('hidden');
-    }
-
-    function showViewer(site, canEdit) {
-      state.current = structuredClone(site);
-      upsertSiteCache(site);
-      clearViews();
-      els.viewer.classList.remove('hidden');
-      els.viewerTitle.textContent = site.title || '無題のサイト';
-      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) => `
-        <article class="block">
-          <div class="rendered-text">${renderFormattedBlock(block)}</div>
-        </article>
-      `).join('') || '<div class="empty">本文がありません。</div>';
-      $('#viewerEditBtn').classList.toggle('hidden', !canEdit);
     }
 
     async function loadSitesFromFirestore() {
@@ -631,7 +1486,6 @@
       const url = currentShareUrl();
       els.shareUrl.textContent = url;
       els.qrBox.innerHTML = '生成中…';
-
       setTimeout(() => {
         els.qrBox.innerHTML = '';
         if (window.QRCode) {
@@ -644,58 +1498,6 @@
           els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
         }
       }, 180);
-    }
-
-    async function fetchSiteByRoute(sitePath) {
-      if (!sitePath) return null;
-
-      const local = state.sites.find((item) => [item.siteId, item.customUrl, item.title].includes(sitePath));
-      if (local) return structuredClone(local);
-
-      if (!state.firebaseReady || !state.db) return null;
-
-      try {
-        const byId = await getDoc(doc(state.db, 'websites', sitePath));
-        if (byId.exists()) return { siteId: byId.id, ...byId.data() };
-
-        let snap = await getDocs(query(collection(state.db, 'websites'), where('customUrl', '==', sitePath)));
-        if (!snap.empty) return { siteId: snap.docs[0].id, ...snap.docs[0].data() };
-
-        snap = await getDocs(query(collection(state.db, 'websites'), where('title', '==', sitePath)));
-        if (!snap.empty) return { siteId: snap.docs[0].id, ...snap.docs[0].data() };
-      } catch (error) {
-        console.error(error);
-      }
-
-      return null;
-    }
-
-    async function openRouteFromHash() {
-      const { sitePath, key } = parseHashRoute();
-      state.routeSite = sitePath;
-      state.routeKey = key;
-
-      if (!sitePath) return;
-
-      const site = await fetchSiteByRoute(sitePath);
-      if (!site) {
-        showNotFound(location.href);
-        return;
-      }
-
-      upsertSiteCache(site);
-
-      if (key && site.key && key === site.key) {
-        openEditor(site);
-        return;
-      }
-
-      const canEdit =
-        site.creatorId === creatorId() ||
-        site.ownerUid === state.uid ||
-        (state.uid && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid));
-
-      showViewer(site, canEdit);
     }
 
     async function saveCurrent() {
@@ -712,50 +1514,99 @@
 
       state.current.updatedAt = new Date().toISOString();
 
-      upsertSiteCache(state.current);
+      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
+      if (index >= 0) state.sites[index] = structuredClone(state.current);
+      else state.sites.unshift(structuredClone(state.current));
+
       await persistSites();
-      history.replaceState(null, '', shareBase(state.current));
+
+      const link = shareBase(state.current);
+      history.replaceState(null, '', link);
       await loadSites();
       renderBlocks();
 
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
+    async function resolveSiteFromRoute(sitePath) {
+      if (!sitePath) return null;
+      const all = state.sites || [];
+      const found = all.find((item) =>
+        [item.customUrl, item.siteId, item.title].includes(sitePath)
+      );
+      if (found) return found;
+
+      if (state.firebaseReady && state.db) {
+        try {
+          const snapshot = await getDocs(collection(state.db, 'websites'));
+          const fresh = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
+          state.sites = fresh;
+          return fresh.find((item) =>
+            [item.customUrl, item.siteId, item.title].includes(sitePath)
+          ) || null;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      return null;
+    }
+
+    async function openRouteFromHash() {
+      const { sitePath, key } = parseHashRoute();
+      state.routeSite = sitePath;
+      state.routeKey = key;
+
+      if (!sitePath) return;
+
+      const site = await resolveSiteFromRoute(sitePath);
+      if (!site) {
+        showNotFound(location.href);
+        return;
+      }
+
+      if (key && site.key && key === site.key) {
+        openEditor(site);
+        return;
+      }
+
+      const canEdit =
+        site.creatorId === creatorId() ||
+        site.ownerUid === state.uid ||
+        (state.uid && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid));
+
+      showViewer(site, canEdit);
+    }
+
+    function showHomeState() {
+      showHome();
+      loadSites();
+    }
+
     $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
-
-    $('#backBtn').addEventListener('click', async () => {
-      showHome();
-      await loadSites();
-    });
-
-    $('#viewerHomeBtn').addEventListener('click', async () => {
-      showHome();
-      await loadSites();
-    });
-
-    $('#viewerEditBtn').addEventListener('click', () => openEditor(state.current));
-
-    $('#saveBtn').addEventListener('click', () => saveCurrent());
-
-    $('#addTextBtn').addEventListener('click', () => openTextDialog());
-
-    $('#showIdBtn').addEventListener('click', () => {
-      $('#ownerIdBtn').textContent = 'ID: ••••';
-      els.idDialog.showModal();
-    });
-
-    $('#ownerIdBtn').addEventListener('click', (event) => {
-      event.currentTarget.textContent = `ID: ${creatorId()}`;
-    });
-
-    $('#copyIdBtn').addEventListener('click', () => {
-      navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました'));
-    });
-
+    $('#newSiteBtn2').addEventListener('click', () => openEditor(makeSite()));
+    $('#showIdBtn').addEventListener('click', () => { $('#ownerIdBtn').textContent = 'ID: ••••'; els.idDialog.showModal(); });
+    $('#showIdBtn2').addEventListener('click', () => { $('#ownerIdBtn').textContent = 'ID: ••••'; els.idDialog.showModal(); });
+    $('#ownerIdBtn').addEventListener('click', (event) => { event.currentTarget.textContent = `ID: ${creatorId()}`; });
+    $('#copyIdBtn').addEventListener('click', () => navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました')));
     $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
-
-    $('#mergeIdBtn').addEventListener('click', () => {
-      confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。');
+    $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。'));
+    $('#backBtn').addEventListener('click', async () => { showHome(); });
+    $('#viewerHomeBtn').addEventListener('click', async () => { showHome(); });
+    $('#viewerEditBtn').addEventListener('click', () => openEditor(state.current));
+    $('#saveBtn').addEventListener('click', () => saveCurrent());
+    $('#addTextBtn').addEventListener('click', () => openTextDialog());
+    $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
+    $('#copyShareBtn').addEventListener('click', () => navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました')));
+    $('#webShareBtn').addEventListener('click', () => {
+      if (navigator.share) {
+        navigator.share({
+          title: state.current.title,
+          url: currentShareUrl()
+        });
+      } else {
+        alert('このブラウザはWeb Share APIに対応していません。');
+      }
     });
 
     els.title.addEventListener('input', () => {
@@ -765,7 +1616,7 @@
     });
 
     els.urlMode.addEventListener('change', () => {
-      els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom');
+      els.customUrlField.classList.toggle('hide', els.urlMode.value !== 'custom');
     });
     els.urlMode.dispatchEvent(new Event('change'));
 
@@ -852,27 +1703,10 @@
       updateQr();
     });
 
-    $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
-
-    $('#copyShareBtn').addEventListener('click', () => {
-      navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました'));
-    });
-
-    $('#webShareBtn').addEventListener('click', () => {
-      if (navigator.share) {
-        navigator.share({
-          title: state.current.title,
-          url: currentShareUrl()
-        });
-      } else {
-        alert('このブラウザはWeb Share APIに対応していません。');
-      }
-    });
-
     els.shareTabs.addEventListener('click', (event) => {
       if (!event.target.matches('.tab')) return;
       state.shareMode = event.target.dataset.share;
-      document.querySelectorAll('.tab').forEach((tab) => {
+      document.querySelectorAll('#shareTabs .tab').forEach((tab) => {
         tab.classList.toggle('active', tab === event.target);
       });
       updateQr();
