@@ -61,6 +61,7 @@
     h1 { font-size: clamp(2rem, 7vw, 4.5rem); letter-spacing: -0.06em; margin-top: 8px; }
     h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
     p { color: var(--muted); line-height: 1.8; }
+
     .hero-actions, .toolbar, .row, .tabs { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .btn {
       min-height: 44px;
@@ -93,6 +94,7 @@
 
     .canvas { min-height: 52vh; padding: 18px; background: rgba(255,255,255,.58); border: 1px dashed #cdd3df; border-radius: var(--radius); }
     .empty { text-align: center; padding: 60px 14px; color: var(--muted); }
+
     .block {
       background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px;
       touch-action: manipulation;
@@ -214,8 +216,14 @@
     <form method="dialog" class="dialog-body">
       <h2>テキストブロック</h2>
       <p>太字はPCなら Ctrl+B、スマホなら文字選択後の標準フォーマット機能で変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
-      <div class="field"><label for="textInput">本文</label><div id="textInput" class="rich-editor" contenteditable="true"></div></div>
-      <div class="toolbar"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" id="applyTextBtn" value="default">反映</button></div>
+      <div class="field">
+        <label for="textInput">本文</label>
+        <div id="textInput" class="rich-editor" contenteditable="true"></div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" value="cancel">キャンセル</button>
+        <button class="btn primary" id="applyTextBtn" value="default">反映</button>
+      </div>
     </form>
   </dialog>
 
@@ -269,8 +277,8 @@
     const $ = (selector) => document.querySelector(selector);
 
     const state = {
-      sites: [],
       allSites: [],
+      sites: [],
       current: null,
       editingBlockId: null,
       shareMode: 'view',
@@ -278,7 +286,7 @@
       db: null,
       firebaseReady: false,
       routeSite: null,
-      routeKey: null
+      routeKey: null,
     };
 
     const els = {
@@ -351,59 +359,8 @@
       return id;
     }
 
-    function clone(value) {
-      return typeof structuredClone === 'function'
-        ? structuredClone(value)
-        : JSON.parse(JSON.stringify(value));
-    }
-
-    function normalizePath(value) {
-      return String(value || '').trim();
-    }
-
-    function isMine(site) {
-      const myCreator = creatorId();
-      return site?.creatorId === myCreator || site?.ownerUid === state.uid || site?.collaborators?.includes(state.uid);
-    }
-
-    async function loadSites() {
-      if (state.firebaseReady && state.db) {
-        await loadSitesFromFirestore();
-      } else {
-        state.allSites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        state.sites = state.allSites.filter((site) => isMine(site));
-      }
-      renderSiteList();
-      openRouteFromHash();
-    }
-
-    async function loadSitesFromFirestore() {
-      const snapshot = await getDocs(collection(state.db, 'websites'));
-      state.allSites = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
-      state.sites = state.allSites
-        .filter((site) => isMine(site))
-        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-      state.allSites.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-    }
-
-    async function persistSites() {
-      if (state.firebaseReady && state.db && state.current) {
-        await saveSiteToFirestore(state.current);
-        return;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.allSites));
-    }
-
-    async function saveSiteToFirestore(site) {
-      const payload = {
-        ...site,
-        ownerUid: site.ownerUid || state.uid || 'anonymous-local-user',
-        creatorId: site.creatorId || creatorId(),
-        collaborators: site.collaborators || [],
-        updatedAt: new Date().toISOString(),
-        updatedAtServer: serverTimestamp()
-      };
-      await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
     }
 
     function slugify(value) {
@@ -427,29 +384,79 @@
         collaborative: false,
         collaborators: [],
         blocks: [
-          {
-            id: crypto.randomUUID(),
-            type: 'text',
-            html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
-          }
+          { id: crypto.randomUUID(), type: 'text', html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'" }
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
     }
 
-    function openEditor(site) {
-      if (!site) return;
-      state.current = clone(site);
-      els.home.classList.add('hidden');
-      els.viewer.classList.add('hidden');
-      els.editor.classList.remove('hidden');
-      els.addBar.classList.remove('hidden');
-      els.title.value = state.current.title;
-      els.key.value = state.current.key || '';
-      els.customUrl.value = state.current.customUrl || '';
-      els.heading.textContent = state.current.title;
-      renderBlocks();
+    function basePageUrl() {
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    }
+
+    function sitePathOf(site) {
+      return site.customUrl || site.siteId || slugify(site.title);
+    }
+
+    function shareBase(site = state.current) {
+      return `${basePageUrl()}#/${sitePathOf(site)}`;
+    }
+
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
+    }
+
+    function canEditSite(site) {
+      if (!site) return false;
+      return site.ownerUid === state.uid || site.creatorId === creatorId() || site.collaborators?.includes(state.uid);
+    }
+
+    function canViewSite(site) {
+      if (!site) return false;
+      if (site.isPublic) return true;
+      return canEditSite(site);
+    }
+
+    async function loadSites() {
+      if (state.firebaseReady && state.db) {
+        await loadSitesFromFirestore();
+      } else {
+        state.allSites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        state.sites = state.allSites.filter((site) => canEditSite(site) || site.isPublic);
+      }
+      renderSiteList();
+      openRouteFromHash();
+    }
+
+    async function loadSitesFromFirestore() {
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      state.allSites = snapshot.docs
+        .map((item) => ({ siteId: item.id, ...item.data() }))
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+
+      state.sites = state.allSites.filter((site) => canEditSite(site) || site.isPublic);
+    }
+
+    async function persistSites() {
+      if (state.firebaseReady && state.db && state.current) {
+        await saveSiteToFirestore(state.current);
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.allSites));
+    }
+
+    async function saveSiteToFirestore(site) {
+      const payload = {
+        ...site,
+        ownerUid: site.ownerUid || state.uid,
+        creatorId: site.creatorId || creatorId(),
+        collaborators: site.collaborators || [],
+        updatedAt: new Date().toISOString(),
+        updatedAtServer: serverTimestamp()
+      };
+      await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
     }
 
     function renderSiteList() {
@@ -459,19 +466,40 @@
       }
 
       els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = isMine(site);
+        const mine = canEditSite(site);
         const handshake = site.collaborative && mine ? '🤝 ' : '';
-        return `
-          <button class="site-card" data-site="${site.siteId}">
-            <strong>${handshake}${escapeHtml(site.title)}</strong>
-            <span>${escapeHtml(shareBase(site))}</span>
-          </button>
-        `;
+        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
       }).join('');
     }
 
+    function renderFormattedBlock(block) {
+      const html = block.html ?? escapeHtml(block.text || '').replace(/\n/g, '<br>');
+      return sanitizeRichHtml(html).replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    }
+
+    function sanitizeRichHtml(value) {
+      const template = document.createElement('template');
+      template.innerHTML = value;
+
+      template.content.querySelectorAll('*').forEach((node) => {
+        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(node.tagName)) {
+          node.replaceWith(...node.childNodes);
+          return;
+        }
+
+        if (node.tagName === 'SPAN') {
+          const color = node.style.color;
+          node.removeAttribute('style');
+          if (color) node.style.color = color;
+        } else {
+          [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+        }
+      });
+
+      return template.innerHTML;
+    }
+
     function renderBlocks() {
-      if (!state.current) return;
       els.heading.textContent = state.current.title || '無題のサイト';
       if (!state.current.blocks?.length) {
         els.canvas.innerHTML = '<div class="empty">下の「＋ 追加」から本文を追加してください。</div>';
@@ -493,62 +521,65 @@
       `).join('');
     }
 
-    function renderFormattedBlock(block) {
-      const base = sanitizeRichHtml(block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>'));
-      return base.replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    function openEditor(site) {
+      state.current = structuredClone(site);
+      els.home.classList.add('hidden');
+      els.viewer.classList.add('hidden');
+      els.editor.classList.remove('hidden');
+      els.addBar.classList.remove('hidden');
+      els.title.value = state.current.title;
+      els.key.value = state.current.key || '';
+      els.customUrl.value = state.current.customUrl || '';
+      els.heading.textContent = state.current.title;
+      els.urlMode.value = state.current.customUrl === state.current.siteId ? 'uuid' : 'title';
+      els.customUrlField.classList.toggle('hidden', els.urlMode.value !== 'custom');
+      renderBlocks();
     }
 
-    function sanitizeRichHtml(value) {
-      const template = document.createElement('template');
-      template.innerHTML = value;
-      template.content.querySelectorAll('*').forEach((node) => {
-        const tag = node.tagName;
-        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(tag)) {
-          node.replaceWith(...node.childNodes);
-          return;
-        }
-        if (tag === 'SPAN') {
-          const color = node.style.color;
-          node.removeAttribute('style');
-          if (color) node.style.color = color;
-        } else {
-          [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
-        }
-      });
-      return template.innerHTML;
+    function showViewer(site, canEdit) {
+      state.current = structuredClone(site);
+      els.home.classList.add('hidden');
+      els.editor.classList.add('hidden');
+      els.addBar.classList.add('hidden');
+      els.viewer.classList.remove('hidden');
+      els.viewerTitle.textContent = site.title || '無題のサイト';
+      els.viewerCanvas.innerHTML = (site.blocks || [])
+        .map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`)
+        .join('') || '<div class="empty">本文がありません。</div>';
+      $('#viewerEditBtn').classList.toggle('hidden', !canEdit);
     }
 
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>'"]/g, (char) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }[char]));
-    }
-
-    function basePageUrl() {
-      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    function showNotFound() {
+      showViewer(
+        {
+          title: 'サイトが見つかりません',
+          blocks: [{
+            id: 'not-found',
+            type: 'text',
+            html: 'このリンクのサイトがまだ読み込めていません。URLが違うか、まだ保存されていない可能性があります。'
+          }]
+        },
+        false
+      );
     }
 
     function parseHashRoute() {
       const hash = decodeURI(location.hash || '');
       if (!hash.startsWith('#/')) return { sitePath: null, key: null };
-      const parts = hash.slice(2).split('/');
-      const sitePath = parts[0] || null;
-      const key = parts[1] || null;
+      const [, sitePath = '', key = null] = hash.slice(2).split('/');
       return { sitePath, key };
     }
 
     function findSiteByPath(sitePath) {
-      const normalized = normalizePath(sitePath);
-      if (!normalized) return null;
-
+      if (!sitePath) return null;
       return state.allSites.find((item) => {
-        return normalizePath(item.customUrl) === normalized
-          || normalizePath(item.siteId) === normalized
-          || normalizePath(item.title) === normalized;
+        const candidates = [
+          item.customUrl,
+          item.siteId,
+          item.title,
+          slugify(item.title),
+        ].filter(Boolean);
+        return candidates.includes(sitePath);
       }) || null;
     }
 
@@ -560,90 +591,36 @@
 
       const site = findSiteByPath(sitePath);
       if (!site) {
-        showViewer({
-          title: 'サイトが見つかりません',
-          blocks: [{
-            id: 'not-found',
-            type: 'text',
-            html: 'このリンクのサイトがまだ読み込めていません。'
-          }]
-        }, false);
+        showNotFound();
         return;
       }
 
-      const canEdit = Boolean(key && site.key && key === site.key && isMine(site));
-      if (canEdit) {
+      if (!canViewSite(site)) {
+        showViewer(
+          {
+            title: '権限がありません',
+            blocks: [{
+              id: 'forbidden',
+              type: 'text',
+              html: 'このサイトは非公開です。作成者または共同編集者だけが見られます。'
+            }]
+          },
+          false
+        );
+        return;
+      }
+
+      const canEdit = key && site.key && key === site.key ? true : canEditSite(site);
+      if (key && site.key && key === site.key) {
         openEditor(site);
-        return;
+      } else {
+        showViewer(site, canEdit);
       }
-
-      showViewer(site, isMine(site));
-    }
-
-    function showViewer(site, canEdit) {
-      state.current = clone(site);
-      els.home.classList.add('hidden');
-      els.editor.classList.add('hidden');
-      els.addBar.classList.add('hidden');
-      els.viewer.classList.remove('hidden');
-      els.viewerTitle.textContent = site.title || '無題のサイト';
-      els.viewerCanvas.innerHTML = (site.blocks || []).map((block) => `
-        <article class="block">
-          <div class="rendered-text">${renderFormattedBlock(block)}</div>
-        </article>
-      `).join('') || '<div class="empty">本文がありません。</div>';
-      $('#viewerEditBtn').classList.toggle('hidden', !canEdit);
-    }
-
-    function shareBase(site = state.current) {
-      const path = site?.customUrl || site?.siteId || slugify(site?.title);
-      return `${basePageUrl()}#/${path}`;
-    }
-
-    function currentShareUrl() {
-      const base = shareBase();
-      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
-    }
-
-    async function saveCurrent() {
-      if (!state.current) return;
-
-      const selectedMode = els.urlMode.value;
-      const title = els.title.value.trim() || '無題のサイト';
-      state.current.title = title;
-      state.current.ownerUid = state.current.ownerUid === 'anonymous-local-user' && state.uid ? state.uid : state.current.ownerUid;
-      state.current.key = els.key.value.trim();
-      state.current.collaborative = Boolean(state.current.key);
-
-      if (!state.current.customUrl) {
-        if (selectedMode === 'uuid') {
-          state.current.customUrl = state.current.siteId;
-        } else if (selectedMode === 'custom') {
-          state.current.customUrl = slugify(els.customUrl.value);
-        } else {
-          state.current.customUrl = slugify(title);
-        }
-      }
-
-      state.current.updatedAt = new Date().toISOString();
-
-      const index = state.allSites.findIndex((site) => site.siteId === state.current.siteId);
-      if (index >= 0) state.allSites[index] = clone(state.current);
-      else state.allSites.unshift(clone(state.current));
-
-      state.sites = state.allSites.filter((site) => isMine(site)).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-
-      await persistSites();
-
-      history.replaceState(null, '', shareBase(state.current));
-      renderSiteList();
-      renderBlocks();
-      alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
     function openTextDialog(blockId = null) {
       state.editingBlockId = blockId;
-      const block = state.current?.blocks?.find((item) => item.id === blockId);
+      const block = state.current.blocks.find((item) => item.id === blockId);
       els.textInput.innerHTML = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
       els.textDialog.showModal();
     }
@@ -654,9 +631,40 @@
       els.qrBox.innerHTML = '生成中…';
       setTimeout(() => {
         els.qrBox.innerHTML = '';
-        if (window.QRCode) new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
-        else els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
+        if (window.QRCode) {
+          new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
+        } else {
+          els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
+        }
       }, 180);
+    }
+
+    async function saveCurrent() {
+      state.current.title = els.title.value.trim() || '無題のサイト';
+      state.current.ownerUid = state.current.ownerUid === 'anonymous-local-user' && state.uid ? state.uid : state.current.ownerUid;
+      state.current.key = els.key.value.trim();
+      state.current.collaborative = Boolean(state.current.key);
+
+      if (!state.current.customUrl) {
+        state.current.customUrl = els.urlMode.value === 'uuid'
+          ? state.current.siteId
+          : slugify(els.urlMode.value === 'custom' ? els.customUrl.value : state.current.title);
+      }
+
+      state.current.updatedAt = new Date().toISOString();
+
+      const allIndex = state.allSites.findIndex((site) => site.siteId === state.current.siteId);
+      if (allIndex >= 0) state.allSites[allIndex] = structuredClone(state.current);
+      else state.allSites.unshift(structuredClone(state.current));
+
+      state.sites = state.allSites.filter((site) => canEditSite(site) || site.isPublic);
+      await persistSites();
+
+      history.replaceState(null, '', shareBase(state.current));
+      renderSiteList();
+      renderBlocks();
+
+      alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
     $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
@@ -673,8 +681,6 @@
     $('#viewerHomeBtn').addEventListener('click', async () => {
       history.replaceState(null, '', location.pathname);
       els.viewer.classList.add('hidden');
-      els.editor.classList.add('hidden');
-      els.addBar.classList.add('hidden');
       els.home.classList.remove('hidden');
       await loadSites();
     });
@@ -692,12 +698,18 @@
       event.currentTarget.textContent = `ID: ${creatorId()}`;
     });
 
-    $('#copyIdBtn').addEventListener('click', () => navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました')));
+    $('#copyIdBtn').addEventListener('click', () =>
+      navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました'))
+    );
+
     $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
-    $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。'));
+
+    $('#mergeIdBtn').addEventListener('click', () =>
+      confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') &&
+      alert('ここは次に本実装する場所です。')
+    );
 
     els.title.addEventListener('input', () => {
-      if (!state.current) return;
       state.current.title = els.title.value;
       els.heading.textContent = state.current.title || '無題のサイト';
     });
@@ -707,61 +719,47 @@
     });
     els.urlMode.dispatchEvent(new Event('change'));
 
-    $('#applyTextBtn').addEventListener('click', (event) => {
-      event.preventDefault();
+    $('#applyTextBtn').addEventListener('click', () => {
       const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
-      if (!state.current) return;
-
       if (state.editingBlockId) {
-        const block = state.current.blocks.find((item) => item.id === state.editingBlockId);
-        if (block) block.html = html;
+        const target = state.current.blocks.find((item) => item.id === state.editingBlockId);
+        if (target) target.html = html;
       } else {
         state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       }
       renderBlocks();
-      els.textDialog.close();
     });
 
     els.siteList.addEventListener('click', (event) => {
       const card = event.target.closest('[data-site]');
       if (!card) return;
-      const site = state.allSites.find((item) => item.siteId === card.dataset.site);
-      openEditor(site);
+      const site = state.sites.find((item) => item.siteId === card.dataset.site);
+      if (site) openEditor(site);
     });
 
     els.canvas.addEventListener('click', (event) => {
       const blockEl = event.target.closest('[data-block]');
       const action = event.target.dataset.action;
-      if (!blockEl || !action || !state.current) return;
+      if (!blockEl || !action) return;
 
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
       if (index < 0) return;
 
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
-      if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...clone(state.current.blocks[index]), id: crypto.randomUUID() });
+      if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
       if (action === 'delete' && confirm('このブロックを削除しますか？')) state.current.blocks.splice(index, 1);
       renderBlocks();
     });
 
     let dragId = null;
     els.canvas.addEventListener('dragstart', (event) => {
-      const target = event.target.closest('[data-block]');
-      if (!target) return;
-      dragId = target.dataset.block;
-      target.classList.add('dragging');
+      dragId = event.target.closest('[data-block]')?.dataset.block || null;
+      event.target.closest('.block')?.classList.add('dragging');
     });
-
-    els.canvas.addEventListener('dragend', (event) => {
-      const target = event.target.closest('[data-block]');
-      if (target) target.classList.remove('dragging');
-      dragId = null;
-    });
-
+    els.canvas.addEventListener('dragend', (event) => event.target.closest('.block')?.classList.remove('dragging'));
     els.canvas.addEventListener('dragover', (event) => event.preventDefault());
-
     els.canvas.addEventListener('drop', (event) => {
       event.preventDefault();
-      if (!state.current) return;
       const target = event.target.closest('[data-block]')?.dataset.block;
       if (!dragId || !target || dragId === target) return;
       const from = state.current.blocks.findIndex((block) => block.id === dragId);
@@ -780,10 +778,14 @@
     });
 
     $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
-    $('#copyShareBtn').addEventListener('click', () => navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました')));
+
+    $('#copyShareBtn').addEventListener('click', () =>
+      navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました'))
+    );
+
     $('#webShareBtn').addEventListener('click', () => {
       if (navigator.share) {
-        navigator.share({ title: state.current?.title || 'CreateWebsite', url: currentShareUrl() });
+        navigator.share({ title: state.current.title, url: currentShareUrl() });
       } else {
         alert('このブラウザはWeb Share APIに対応していません。');
       }
