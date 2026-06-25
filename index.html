@@ -178,78 +178,6 @@
       margin-bottom:6px;
     }
 
-    .gridEditor{
-      display:grid;
-      grid-template-columns:64px 1fr;
-      border:1px solid var(--line);
-      border-radius:18px;
-      overflow:hidden;
-      min-height:420px;
-      background:var(--panel);
-      align-items:stretch;
-    }
-
-    .gutter{
-      background:rgba(127,127,127,.07);
-      border-right:1px solid var(--line);
-      padding:14px 8px 14px 0;
-      text-align:right;
-      color:#8a93a8;
-      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      white-space:pre;
-      user-select:none;
-      overflow:hidden;
-      align-self:stretch;
-      min-height:420px;
-    }
-
-    .editorTextWrap{
-      position:relative;
-      min-height:420px;
-      overflow:hidden;
-      background:var(--panel);
-    }
-
-    .editorMirror{
-      position:absolute;
-      inset:0;
-      padding:14px;
-      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      white-space:pre;
-      overflow:auto;
-      color:var(--text);
-      pointer-events:none;
-      z-index:1;
-      scrollbar-gutter:stable;
-    }
-
-    .editorMirror .memoText{
-      color:#98a0af;
-    }
-    body.dark .editorMirror .memoText{
-      color:#7e8798;
-    }
-
-    .textarea{
-      position:relative;
-      z-index:2;
-      width:100%;
-      border:none;
-      outline:none;
-      resize:none;
-      min-height:420px;
-      padding:14px;
-      font:600 15px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      white-space:pre;
-      overflow:auto;
-      touch-action:pan-x pan-y;
-      tab-size:2;
-      background:transparent;
-      color:transparent;
-      caret-color:var(--text);
-      scrollbar-gutter:stable;
-    }
-
     .help,.note{
       color:var(--muted);
       font-size:13px;
@@ -271,16 +199,6 @@
       font-size:13px;
       font-weight:700;
     }
-
-    .sectionText{
-      font-size:18px;
-      font-weight:900;
-      line-height:1.35;
-      color:#334155;
-      word-break:break-word;
-      white-space:normal;
-    }
-    body.dark .sectionText{ color:#d7def0; }
 
     .question{
       font-size:clamp(22px,4vw,32px);
@@ -486,30 +404,6 @@
       word-break:break-word;
     }
 
-    .choiceGrid{
-      display:grid;
-      gap:10px;
-      grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    }
-
-    .choiceBtn{
-      text-align:center;
-      width:100%;
-    }
-
-    .choiceBtn.selected{
-      background:#dfe9ff !important;
-      border-color:#9ab8ff !important;
-      box-shadow:0 0 0 4px rgba(47,111,237,.08);
-      color:#173a88 !important;
-    }
-    body.dark .choiceBtn.selected{
-      background:#31445f !important;
-      border-color:#6b92ff !important;
-      box-shadow:0 0 0 4px rgba(91,140,255,.15);
-      color:#f3f7ff !important;
-    }
-
     .homeControls{
       display:grid;
       gap:10px;
@@ -541,14 +435,6 @@
       font-weight:900;
       margin:0 0 10px;
       color:var(--text);
-    }
-
-    .dividerLine{
-      text-align:center;
-      color:var(--muted);
-      font-weight:900;
-      margin:10px 0 6px;
-      user-select:none;
     }
 
     .publicBadge{
@@ -994,7 +880,6 @@
     @media (max-width:640px){
       .page{ padding:14px; }
       .title{ font-size:22px; }
-      .gridEditor{ grid-template-columns:52px 1fr; min-height:380px; }
       .question{ font-size:22px; }
       .answer{ font-size:16px; }
       .bigBtn{ width:100%; }
@@ -1247,8 +1132,14 @@
     function parseHashRoute() {
       const hash = decodeURI(location.hash || '');
       if (!hash.startsWith('#/')) return { sitePath: null, key: null };
-      const [, sitePath = '', key = null] = hash.slice(2).split('/');
-      return { sitePath, key };
+      const raw = hash.slice(2);
+      const parts = raw.split('/').filter(Boolean);
+      if (!parts.length) return { sitePath: null, key: null };
+      if (parts.length === 1) return { sitePath: decodeURIComponent(parts[0]), key: null };
+      return {
+        sitePath: decodeURIComponent(parts[0]),
+        key: decodeURIComponent(parts.slice(1).join('/'))
+      };
     }
 
     function makeSite() {
@@ -1530,9 +1421,11 @@
 
     async function resolveSiteFromRoute(sitePath) {
       if (!sitePath) return null;
+
+      const normalizedPath = decodeURIComponent(String(sitePath)).trim();
       const all = state.sites || [];
       const found = all.find((item) =>
-        [item.customUrl, item.siteId, item.title].includes(sitePath)
+        [item.customUrl, item.siteId, item.title, slugify(item.title)].includes(normalizedPath)
       );
       if (found) return found;
 
@@ -1542,7 +1435,7 @@
           const fresh = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
           state.sites = fresh;
           return fresh.find((item) =>
-            [item.customUrl, item.siteId, item.title].includes(sitePath)
+            [item.customUrl, item.siteId, item.title, slugify(item.title)].includes(normalizedPath)
           ) || null;
         } catch (err) {
           console.error(err);
@@ -1578,8 +1471,7 @@
       showViewer(site, canEdit);
     }
 
-    function showHomeState() {
-      showHome();
+    function loadSitesAndStay(){
       loadSites();
     }
 
@@ -1591,8 +1483,8 @@
     $('#copyIdBtn').addEventListener('click', () => navigator.clipboard?.writeText(creatorId()).then(() => alert('IDをコピーしました')));
     $('#closeIdBtn').addEventListener('click', () => els.idDialog.close());
     $('#mergeIdBtn').addEventListener('click', () => confirm('ID統合は元に戻せません。統合先IDを確認してから実行してください。') && alert('デモでは統合の流れだけ表示しています。'));
-    $('#backBtn').addEventListener('click', async () => { showHome(); });
-    $('#viewerHomeBtn').addEventListener('click', async () => { showHome(); });
+    $('#backBtn').addEventListener('click', async () => { showHome(); await loadSitesAndStay(); });
+    $('#viewerHomeBtn').addEventListener('click', async () => { showHome(); await loadSitesAndStay(); });
     $('#viewerEditBtn').addEventListener('click', () => openEditor(state.current));
     $('#saveBtn').addEventListener('click', () => saveCurrent());
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
