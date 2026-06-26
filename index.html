@@ -433,6 +433,32 @@
       return `${location.origin}${path}`;
     }
 
+    function makeSite() {
+      return normalizeSite({
+        siteId: crypto.randomUUID().slice(0, 8),
+        title: '無題のサイト',
+        ownerUid: state.uid || `local:${creatorId()}`,
+        creatorId: creatorId(),
+        routeMode: 'title',
+        routeSlug: '',
+        customUrl: '',
+        key: '',
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: 'text',
+            text: 'こんにちは\nB太字B\n#ff0000赤文字#ff0000',
+            html: ''
+          }
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     function inferRouteMode(site) {
       if (site.routeMode) return site.routeMode;
       if (site.routeSlug && site.siteId && site.routeSlug === site.siteId) return 'uuid';
@@ -466,32 +492,6 @@
         createdAt: site.createdAt || new Date().toISOString(),
         updatedAt: site.updatedAt || new Date().toISOString()
       };
-    }
-
-    function makeSite() {
-      return normalizeSite({
-        siteId: crypto.randomUUID().slice(0, 8),
-        title: '無題のサイト',
-        ownerUid: state.uid || `local:${creatorId()}`,
-        creatorId: creatorId(),
-        routeMode: 'title',
-        routeSlug: '',
-        customUrl: '',
-        key: '',
-        isPublic: true,
-        collaborative: false,
-        collaborators: [],
-        blocks: [
-          {
-            id: crypto.randomUUID(),
-            type: 'text',
-            text: 'こんにちは\nB太字B\n#ff0000赤文字#ff0000',
-            html: ''
-          }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
     }
 
     function loadLocalSites() {
