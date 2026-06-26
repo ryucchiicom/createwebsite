@@ -446,7 +446,18 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+      getFirestore,
+      collection,
+      doc,
+      getDoc,
+      getDocs,
+      query,
+      where,
+      limit,
+      setDoc,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // Firebaseに保存するには、自分のFirebaseプロジェクト設定を入れてください。
     // 空のままだと開発用にlocalStorageへ保存します。
@@ -506,7 +517,7 @@
     async function initFirebase() {
       if (!hasFirebaseConfig()) {
         console.warn('Firebase config is empty. Using localStorage fallback.');
-        loadSites();
+        await loadSites();
         return;
       }
 
@@ -526,7 +537,7 @@
       } catch (error) {
         console.error('Firebase initialization failed. Falling back to localStorage.', error);
         state.firebaseReady = false;
-        loadSites();
+        await loadSites();
       }
     }
 
@@ -558,6 +569,23 @@
       return site?.ownerUid === state.uid || site?.creatorId === creatorId() || site?.collaborators?.includes(state.uid);
     }
 
+    function slugify(value) {
+      return (value || 'untitled')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '')
+        .slice(0, 48) || crypto.randomUUID().slice(0, 8);
+    }
+
+    function siteRouteCandidates(site) {
+      const candidates = [];
+      if (site?.customUrl) candidates.push(site.customUrl);
+      if (site?.siteId) candidates.push(site.siteId);
+      if (site?.title) candidates.push(slugify(site.title));
+      return candidates;
+    }
+
     async function loadSites() {
       if (state.firebaseReady && state.db) {
         await loadSitesFromFirestore();
@@ -565,7 +593,7 @@
         state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       }
       renderSiteList();
-      openRouteFromHash();
+      await openRouteFromHash();
     }
 
     async function loadSitesFromFirestore() {
@@ -593,15 +621,6 @@
         updatedAtServer: serverTimestamp()
       };
       await setDoc(doc(state.db, 'websites', site.siteId), payload, { merge: true });
-    }
-
-    function slugify(value) {
-      return (value || 'untitled')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '')
-        .slice(0, 48) || crypto.randomUUID().slice(0, 8);
     }
 
     function makeSite() {
@@ -731,21 +750,46 @@
       return { sitePath, key };
     }
 
-    function findSiteByRoute(sitePath) {
-      return state.sites.find((item) => {
-        const slug = slugify(item.title);
-        return [item.customUrl, item.siteId, slug].includes(sitePath);
-      });
+    async function findSiteByRoute(sitePath) {
+      if (!sitePath) return null;
+
+      const localMatch = state.sites.find((site) => siteRouteCandidates(site).includes(sitePath));
+      if (localMatch) return localMatch;
+
+      if (!state.firebaseReady || !state.db) return null;
+
+      try {
+        const docSnap = await getDoc(doc(state.db, 'websites', sitePath));
+        if (docSnap.exists()) {
+          return { siteId: docSnap.id, ...docSnap.data() };
+        }
+      } catch (error) {
+        console.warn('Direct doc lookup failed:', error);
+      }
+
+      try {
+        const q = query(collection(state.db, 'websites'), where('customUrl', '==', sitePath), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const item = snap.docs[0];
+          return { siteId: item.id, ...item.data() };
+        }
+      } catch (error) {
+        console.warn('customUrl query failed:', error);
+      }
+
+      return null;
     }
 
-    function openRouteFromHash() {
+    async function openRouteFromHash() {
       const { sitePath, key } = parseHashRoute();
       state.routeSite = sitePath;
       state.routeKey = key;
 
       if (!sitePath) return;
 
-      const site = findSiteByRoute(sitePath);
+      const site = await findSiteByRoute(sitePath);
+
       if (!site) {
         showViewer({
           title: 'サイトが見つかりません',
@@ -899,11 +943,14 @@
 
     $('#applyTextBtn').addEventListener('click', () => {
       const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
+
       if (state.editingBlockId) {
-        state.current.blocks.find((item) => item.id === state.editingBlockId).html = html;
+        const target = state.current.blocks.find((item) => item.id === state.editingBlockId);
+        if (target) target.html = html;
       } else {
         state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       }
+
       renderBlocks();
     });
 
@@ -919,6 +966,8 @@
       if (!blockEl || !action) return;
 
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
+
+      if (index < 0) return;
 
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
       if (action === 'copy') {
@@ -956,6 +1005,8 @@
 
       const from = state.current.blocks.findIndex((block) => block.id === dragId);
       const to = state.current.blocks.findIndex((block) => block.id === target);
+      if (from < 0 || to < 0) return;
+
       const [moved] = state.current.blocks.splice(from, 1);
       state.current.blocks.splice(to, 0, moved);
 
@@ -989,7 +1040,9 @@
       updateQr();
     });
 
-    window.addEventListener('hashchange', openRouteFromHash);
+    window.addEventListener('hashchange', () => {
+      openRouteFromHash();
+    });
 
     creatorId();
     initFirebase();
