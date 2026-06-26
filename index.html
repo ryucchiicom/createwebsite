@@ -964,6 +964,7 @@
       state.current.title = els.title.value;
       els.heading.textContent = state.current.title || '無題のサイト';
       if (!state.current.routeSlug && els.urlMode.value === 'title') {
+        // 新規作成中だけタイトル連動
         renderBlocks();
       }
     });
