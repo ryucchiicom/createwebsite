@@ -554,7 +554,6 @@
 
     async function initFirebase() {
       if (!hasFirebaseConfig()) {
-        console.warn('Firebase config is empty. Using localStorage fallback.');
         await loadSites();
         return;
       }
@@ -618,8 +617,22 @@
       }[char]));
     }
 
-    function isPublicSite(site) {
-      return site?.isPublic !== false;
+    function normalizeSite(site) {
+      if (!site) return null;
+      return {
+        siteId: site.siteId || crypto.randomUUID().slice(0, 8),
+        title: site.title || '無題のサイト',
+        ownerUid: site.ownerUid || 'anonymous-local-user',
+        creatorId: site.creatorId || creatorId(),
+        customUrl: site.customUrl || '',
+        key: site.key || '',
+        isPublic: site.isPublic !== false,
+        collaborative: Boolean(site.key || site.collaborative),
+        collaborators: Array.isArray(site.collaborators) ? site.collaborators : [],
+        blocks: Array.isArray(site.blocks) ? site.blocks : [],
+        createdAt: site.createdAt || new Date().toISOString(),
+        updatedAt: site.updatedAt || new Date().toISOString()
+      };
     }
 
     function hasEditAccess(site) {
@@ -631,8 +644,8 @@
       );
     }
 
-    function siteMatchesRoute(site, routeSiteId) {
-      return Boolean(site && routeSiteId && String(site.siteId) === String(routeSiteId));
+    function isPublicSite(site) {
+      return site?.isPublic !== false;
     }
 
     function basePageUrl() {
@@ -663,22 +676,21 @@
       els.addBar.classList.toggle('hidden', view !== 'editor');
     }
 
-    function normalizeSite(site) {
-      if (!site) return null;
-      return {
-        siteId: site.siteId || crypto.randomUUID().slice(0, 8),
-        title: site.title || '無題のサイト',
-        ownerUid: site.ownerUid || 'anonymous-local-user',
-        creatorId: site.creatorId || creatorId(),
-        customUrl: site.customUrl || '',
-        key: site.key || '',
-        isPublic: site.isPublic !== false,
-        collaborative: Boolean(site.key || site.collaborative),
-        collaborators: Array.isArray(site.collaborators) ? site.collaborators : [],
-        blocks: Array.isArray(site.blocks) ? site.blocks : [],
-        createdAt: site.createdAt || new Date().toISOString(),
-        updatedAt: site.updatedAt || new Date().toISOString()
-      };
+    function siteMatchesRoute(site, routeValue) {
+      return Boolean(site && routeValue && String(site.siteId) === String(routeValue));
+    }
+
+    function syncHashForSite(site, edit = false) {
+      if (!site) return;
+      const next = edit && site.key ? `${shareBase(site)}/${site.key}` : shareBase(site);
+      history.replaceState(null, '', next);
+      state.routeSiteId = site.siteId;
+      state.routeKey = edit ? site.key : null;
+    }
+
+    function currentShareUrl() {
+      if (!state.current) return basePageUrl();
+      return state.shareMode === 'edit' ? editShareUrl(state.current) : shareBase(state.current);
     }
 
     function makeSite() {
@@ -729,22 +741,21 @@
       if (!state.firebaseReady || !state.db || !siteId) return null;
 
       const snap = await getDoc(doc(state.db, 'websites', siteId));
-      if (!snap.exists()) return null;
+      if (snap.exists()) {
+        return normalizeSite({ siteId: snap.id, ...snap.data() });
+      }
 
-      return normalizeSite({ siteId: snap.id, ...snap.data() });
-    }
-
-    function syncHashForSite(site, edit = false) {
-      if (!site) return;
-      const next = edit && site.key ? `${shareBase(site)}/${site.key}` : shareBase(site);
-      history.replaceState(null, '', next);
-      state.routeSiteId = site.siteId;
-      state.routeKey = edit ? site.key : null;
-    }
-
-    function currentShareUrl() {
-      if (!state.current) return basePageUrl();
-      return state.shareMode === 'edit' ? editShareUrl(state.current) : shareBase(state.current);
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      const allSites = snapshot.docs.map((item) => normalizeSite({ siteId: item.id, ...item.data() }));
+      return allSites.find((site) => {
+        const candidates = [
+          site.customUrl,
+          site.siteId,
+          site.title,
+          slugify(site.title)
+        ].filter(Boolean).map(String);
+        return candidates.includes(String(siteId));
+      }) || null;
     }
 
     async function openRouteFromHash() {
