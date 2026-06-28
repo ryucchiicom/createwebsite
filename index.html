@@ -25,7 +25,6 @@
 
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-
     body {
       margin: 0;
       min-height: 100vh;
@@ -84,10 +83,7 @@
     }
 
     h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
-    p {
-      color: var(--muted);
-      line-height: 1.8;
-    }
+    p { color: var(--muted); line-height: 1.8; }
 
     .hero-actions, .toolbar, .row, .tabs {
       display: flex;
@@ -113,13 +109,7 @@
     }
 
     .btn.primary:hover { background: var(--brand-dark); }
-
-    .btn.danger {
-      color: #fff;
-      background: var(--danger);
-      box-shadow: none;
-    }
-
+    .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
     .btn.ghost { background: transparent; }
     .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
 
@@ -493,6 +483,8 @@
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { getFirestore, collection, getDocs, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+    // Firebaseに保存するには、自分のFirebaseプロジェクト設定を入れてください。
+    // 空のままだと開発用にlocalStorageへ保存します。
     const firebaseConfig = {
       apiKey: '',
       authDomain: '',
@@ -515,8 +507,7 @@
       db: null,
       firebaseReady: false,
       routeSite: null,
-      routeKey: null,
-      routeMode: null
+      routeKey: null
     };
 
     const els = {
@@ -545,7 +536,39 @@
     };
 
     function hasFirebaseConfig() {
-      return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+      return Boolean(
+        firebaseConfig.apiKey &&
+        firebaseConfig.authDomain &&
+        firebaseConfig.projectId &&
+        firebaseConfig.appId
+      );
+    }
+
+    async function initFirebase() {
+      if (!hasFirebaseConfig()) {
+        console.warn('Firebase config is empty. Using localStorage fallback.');
+        await loadSites();
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+
+        await signInAnonymously(auth);
+
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          state.uid = user.uid;
+          state.firebaseReady = true;
+          await loadSites();
+        });
+      } catch (error) {
+        console.error('Firebase initialization failed. Falling back to localStorage.', error);
+        state.firebaseReady = false;
+        await loadSites();
+      }
     }
 
     function getCookie(name) {
@@ -584,39 +607,6 @@
       }[char]));
     }
 
-    function basePageUrl() {
-      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
-    }
-
-    function sitePathOf(site) {
-      return site?.customUrl || site?.siteId || slugify(site?.title);
-    }
-
-    function buildRoute(mode, site, key = '') {
-      const path = typeof site === 'string' ? site : sitePathOf(site);
-      if (!path) return location.pathname;
-      const suffix = key ? `/${encodeURIComponent(key)}` : '';
-      return `#/` + `${mode}/${encodeURIComponent(path)}${suffix}`;
-    }
-
-    function viewerUrl(site) {
-      return `${basePageUrl()}${buildRoute('view', site)}`;
-    }
-
-    function editorUrl(site, key = '') {
-      return `${basePageUrl()}${buildRoute('edit', site, key)}`;
-    }
-
-    function currentShareUrl() {
-      if (!state.current) return basePageUrl();
-
-      if (state.shareMode === 'edit' && state.current.key) {
-        return editorUrl(state.current, state.current.key);
-      }
-
-      return viewerUrl(state.current);
-    }
-
     function hasEditAccess(site) {
       if (!site) return false;
       return Boolean(
@@ -628,6 +618,76 @@
 
     function isPublicSite(site) {
       return site?.isPublic !== false;
+    }
+
+    function basePageUrl() {
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    }
+
+    function shareBase(site = state.current) {
+      const path = site?.customUrl || site?.siteId || slugify(site?.title);
+      return `${basePageUrl()}#/${path}`;
+    }
+
+    function syncUrlForSite(site, { edit = false } = {}) {
+      if (!site) return;
+      const base = shareBase(site);
+      const next = edit && site.key ? `${base}/${site.key}` : base;
+      history.replaceState(null, '', next);
+    }
+
+    function parseHashRoute() {
+      const hash = decodeURI(location.hash || '');
+      if (!hash.startsWith('#/')) return { sitePath: null, key: null };
+      const raw = hash.slice(2);
+      const [sitePath = '', key = null] = raw.split('/');
+      return { sitePath: sitePath || null, key };
+    }
+
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
+    }
+
+    function setView(view) {
+      els.home.classList.toggle('hidden', view !== 'home');
+      els.viewer.classList.toggle('hidden', view !== 'viewer');
+      els.editor.classList.toggle('hidden', view !== 'editor');
+      els.addBar.classList.toggle('hidden', view !== 'editor');
+    }
+
+    async function loadSites() {
+      if (state.firebaseReady && state.db) {
+        await loadSitesFromFirestore();
+      } else {
+        state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      }
+
+      renderSiteList();
+      await openRouteFromHash();
+    }
+
+    async function loadSitesFromFirestore() {
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      state.sites = snapshot.docs
+        .map((item) => ({ siteId: item.id, ...item.data() }))
+        .filter((site) => isPublicSite(site) || hasEditAccess(site))
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    }
+
+    async function resolveSiteByRoute(sitePath) {
+      if (!sitePath) return null;
+
+      const localMatch = state.sites.find((site) => siteMatchesRoute(site, sitePath));
+      if (localMatch) return localMatch;
+
+      if (state.firebaseReady && state.db) {
+        const snapshot = await getDocs(collection(state.db, 'websites'));
+        const allSites = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
+        return allSites.find((site) => siteMatchesRoute(site, sitePath)) || null;
+      }
+
+      return null;
     }
 
     function siteMatchesRoute(site, routeValue) {
@@ -642,37 +702,44 @@
       return candidates.includes(String(routeValue));
     }
 
-    function parseHashRoute() {
-      const hash = decodeURI(location.hash || '');
-      if (!hash.startsWith('#/')) return { mode: null, sitePath: null, key: null };
-
-      const parts = hash.slice(2).split('/').filter(Boolean);
-      if (!parts.length) return { mode: null, sitePath: null, key: null };
-
-      if (parts[0] === 'view' || parts[0] === 'edit') {
-        return {
-          mode: parts[0],
-          sitePath: parts[1] || null,
-          key: parts[2] || null
-        };
-      }
-
+    function makeSite() {
       return {
-        mode: 'view',
-        sitePath: parts[0] || null,
-        key: parts[1] || null
+        siteId: crypto.randomUUID().slice(0, 8),
+        title: '無題のサイト',
+        ownerUid: state.uid || 'anonymous-local-user',
+        creatorId: creatorId(),
+        customUrl: '',
+        key: '',
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: 'text',
+            html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
+          }
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
     }
 
-    function setView(view) {
-      els.home.classList.toggle('hidden', view !== 'home');
-      els.viewer.classList.toggle('hidden', view !== 'viewer');
-      els.editor.classList.toggle('hidden', view !== 'editor');
-      els.addBar.classList.toggle('hidden', view !== 'editor');
-    }
+    function openEditor(site, { syncHash = false, preferEditRoute = false } = {}) {
+      if (!site) return;
 
-    function showHome() {
-      setView('home');
+      state.current = structuredClone(site);
+      state.editingBlockId = null;
+      els.title.value = state.current.title || '';
+      els.key.value = state.current.key || '';
+      els.customUrl.value = state.current.customUrl || '';
+      els.heading.textContent = state.current.title || '無題のサイト';
+      setView('editor');
+      renderBlocks();
+
+      if (syncHash) {
+        syncUrlForSite(state.current, { edit: preferEditRoute && Boolean(state.current.key) });
+      }
     }
 
     function showViewer(site, canEdit) {
@@ -692,6 +759,19 @@
       els.viewerCanvas.innerHTML = '<div class="empty">このページは非公開です。正しい閲覧リンクか共同編集Keyが必要です。</div>';
       els.viewerEditBtn.classList.add('hidden');
       setView('viewer');
+    }
+
+    function renderSiteList() {
+      if (!state.sites.length) {
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
+        return;
+      }
+
+      els.siteList.innerHTML = state.sites.map((site) => {
+        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
+        const handshake = site.collaborative && mine ? '🤝 ' : '';
+        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
+      }).join('');
     }
 
     function sanitizeRichHtml(value) {
@@ -717,8 +797,8 @@
     }
 
     function renderFormattedBlock(block) {
-      const base = sanitizeRichHtml(block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>'));
-      return base.replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+      return sanitizeRichHtml(block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>'))
+        .replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
     }
 
     function renderBlocks() {
@@ -744,106 +824,8 @@
       `).join('');
     }
 
-    function makeSite() {
-      return {
-        siteId: crypto.randomUUID().slice(0, 8),
-        title: '無題のサイト',
-        ownerUid: state.uid || 'anonymous-local-user',
-        creatorId: creatorId(),
-        customUrl: '',
-        key: '',
-        isPublic: true,
-        collaborative: false,
-        collaborators: [],
-        blocks: [{ id: crypto.randomUUID(), type: 'text', html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'" }],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    }
-
-    async function fetchAllSitesFromFirestore() {
-      const snapshot = await getDocs(collection(state.db, 'websites'));
-      return snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
-    }
-
-    async function loadSitesFromFirestore() {
-      const allSites = await fetchAllSitesFromFirestore();
-      state.sites = allSites
-        .filter((site) => hasEditAccess(site) || isPublicSite(site))
-        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-    }
-
-    async function loadSites() {
-      try {
-        if (state.firebaseReady && state.db) {
-          await loadSitesFromFirestore();
-        } else {
-          state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        }
-      } catch (error) {
-        console.error('loadSites failed', error);
-        state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      }
-
-      renderSiteList();
-      await openRouteFromHash();
-    }
-
-    async function resolveSiteByRoute(sitePath) {
-      if (!sitePath) return null;
-
-      const localMatch = state.sites.find((site) => siteMatchesRoute(site, sitePath));
-      if (localMatch) return localMatch;
-
-      if (!state.firebaseReady || !state.db) return null;
-
-      try {
-        const allSites = await fetchAllSitesFromFirestore();
-        return allSites.find((site) => siteMatchesRoute(site, sitePath)) || null;
-      } catch (error) {
-        console.error('resolveSiteByRoute failed', error);
-        return null;
-      }
-    }
-
-    function openEditor(site, updateRoute = true) {
-      state.current = structuredClone(site);
-      state.editingBlockId = null;
-
-      els.title.value = state.current.title || '';
-      els.key.value = state.current.key || '';
-      els.customUrl.value = state.current.customUrl || '';
-      els.heading.textContent = state.current.title || '無題のサイト';
-
-      if (updateRoute) {
-        history.replaceState(null, '', editorUrl(state.current));
-      }
-
-      setView('editor');
-      renderBlocks();
-    }
-
-    function openViewer(site, canEdit, updateRoute = true) {
-      state.current = structuredClone(site);
-      state.editingBlockId = null;
-
-      els.viewerTitle.textContent = site.title || '無題のサイト';
-      els.viewerCanvas.innerHTML = (site.blocks || [])
-        .map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`)
-        .join('') || '<div class="empty">本文がありません。</div>';
-
-      els.viewerEditBtn.classList.toggle('hidden', !canEdit);
-
-      if (updateRoute) {
-        history.replaceState(null, '', viewerUrl(site));
-      }
-
-      setView('viewer');
-    }
-
     async function openRouteFromHash() {
-      const { mode, sitePath, key } = parseHashRoute();
-      state.routeMode = mode;
+      const { sitePath, key } = parseHashRoute();
       state.routeSite = sitePath;
       state.routeKey = key;
 
@@ -851,32 +833,35 @@
 
       const site = await resolveSiteByRoute(sitePath);
       if (!site) {
-        showViewer({
-          title: 'サイトが見つかりません',
-          blocks: [{ id: 'not-found', type: 'text', html: 'このリンクのサイトは、まだこの端末またはFirebaseから読み込めていません。' }]
-        }, false, false);
+        showViewer(
+          {
+            title: 'サイトが見つかりません',
+            blocks: [
+              {
+                id: 'not-found',
+                type: 'text',
+                html: 'このリンクのサイトは、まだこの端末またはFirebaseから読み込めていません。'
+              }
+            ]
+          },
+          false
+        );
         return;
       }
 
       const canEdit = hasEditAccess(site);
-      const keyValid = Boolean(key && site.key && key === site.key);
+      const editKeyMatches = Boolean(key && site.key && key === site.key);
 
-      if (mode === 'edit') {
-        if (canEdit || keyValid) {
-          openEditor(site, false);
-          return;
+      if (editKeyMatches || canEdit) {
+        openEditor(site, { syncHash: false });
+        if (canEdit && site.key && !editKeyMatches) {
+          syncUrlForSite(site, { edit: true });
         }
-        showAccessDenied();
         return;
       }
 
-      if (keyValid) {
-        openEditor(site, false);
-        return;
-      }
-
-      if (isPublicSite(site) || canEdit) {
-        openViewer(site, canEdit, false);
+      if (isPublicSite(site)) {
+        showViewer(site, false);
         return;
       }
 
@@ -924,22 +909,20 @@
       state.current.updatedAt = new Date().toISOString();
 
       const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
-      if (index >= 0) {
-        state.sites[index] = structuredClone(state.current);
-      } else {
-        state.sites.unshift(structuredClone(state.current));
-      }
+      if (index >= 0) state.sites[index] = structuredClone(state.current);
+      else state.sites.unshift(structuredClone(state.current));
 
       await persistCurrentSite();
+
       renderSiteList();
       renderBlocks();
 
-      const route = parseHashRoute();
-      if (route.mode === 'edit') {
-        history.replaceState(null, '', editorUrl(state.current));
-      } else {
-        history.replaceState(null, '', viewerUrl(state.current));
-      }
+      const routeIsEdit = Boolean(state.current.key && state.routeKey && state.routeKey === state.current.key);
+      history.replaceState(
+        null,
+        '',
+        routeIsEdit ? `${shareBase(state.current)}/${state.current.key}` : shareBase(state.current)
+      );
 
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
@@ -967,66 +950,26 @@
       }, 180);
     }
 
-    function renderSiteList() {
-      if (!state.sites.length) {
-        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
-        return;
-      }
-
-      els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
-        const handshake = site.collaborative && mine ? '🤝 ' : '';
-        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${sitePathOf(site)}</span></button>`;
-      }).join('');
-    }
-
-    async function initFirebase() {
-      if (!hasFirebaseConfig()) {
-        console.warn('Firebase config is empty. Using localStorage fallback.');
-        await loadSites();
-        return;
-      }
-
-      try {
-        const app = initializeApp(firebaseConfig);
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
-
-        await signInAnonymously(auth);
-
-        onAuthStateChanged(auth, async (user) => {
-          if (!user) return;
-          state.uid = user.uid;
-          state.firebaseReady = true;
-          await loadSites();
-        });
-      } catch (error) {
-        console.error('Firebase initialization failed. Falling back to localStorage.', error);
-        state.firebaseReady = false;
-        await loadSites();
-      }
-    }
-
-    $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite(), false));
-
+    $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite()));
     $('#backBtn').addEventListener('click', async () => {
       history.replaceState(null, '', location.pathname);
-      showHome();
+      setView('home');
       await loadSites();
     });
 
     $('#viewerHomeBtn').addEventListener('click', async () => {
       history.replaceState(null, '', location.pathname);
-      showHome();
+      setView('home');
       await loadSites();
     });
 
     $('#viewerEditBtn').addEventListener('click', () => {
-      if (state.current) openEditor(state.current, true);
+      if (state.current) {
+        openEditor(state.current, { syncHash: true, preferEditRoute: true });
+      }
     });
 
     $('#saveBtn').addEventListener('click', () => saveCurrent());
-
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
 
     $('#showIdBtn').addEventListener('click', () => {
@@ -1065,33 +1008,20 @@
       if (!state.current) return;
 
       const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
-
       if (state.editingBlockId) {
         const target = state.current.blocks.find((item) => item.id === state.editingBlockId);
         if (target) target.html = html;
       } else {
         state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       }
-
       renderBlocks();
     });
 
     els.siteList.addEventListener('click', (event) => {
       const card = event.target.closest('[data-site]');
       if (!card) return;
-
       const site = state.sites.find((item) => item.siteId === card.dataset.site);
-      if (!site) return;
-
-      const canEdit = hasEditAccess(site);
-
-      if (canEdit) {
-        history.replaceState(null, '', editorUrl(site));
-        openEditor(site, false);
-      } else {
-        history.replaceState(null, '', viewerUrl(site));
-        openViewer(site, false, false);
-      }
+      if (site) openEditor(site, { syncHash: true, preferEditRoute: true });
     });
 
     els.canvas.addEventListener('click', (event) => {
@@ -1103,8 +1033,15 @@
       if (index < 0) return;
 
       if (action === 'edit') openTextDialog(state.current.blocks[index].id);
-      if (action === 'copy') state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: crypto.randomUUID() });
-      if (action === 'delete' && confirm('このブロックを削除しますか？')) state.current.blocks.splice(index, 1);
+      if (action === 'copy') {
+        state.current.blocks.splice(index + 1, 0, {
+          ...structuredClone(state.current.blocks[index]),
+          id: crypto.randomUUID()
+        });
+      }
+      if (action === 'delete' && confirm('このブロックを削除しますか？')) {
+        state.current.blocks.splice(index, 1);
+      }
 
       renderBlocks();
     });
