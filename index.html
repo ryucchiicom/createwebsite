@@ -481,10 +481,16 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import { getFirestore, collection, getDocs, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      getDoc,
+      doc,
+      setDoc,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    // Firebaseに保存するには、自分のFirebaseプロジェクト設定を入れてください。
-    // 空のままだと開発用にlocalStorageへ保存します。
     const firebaseConfig = {
       apiKey: '',
       authDomain: '',
@@ -544,33 +550,6 @@
       );
     }
 
-    async function initFirebase() {
-      if (!hasFirebaseConfig()) {
-        console.warn('Firebase config is empty. Using localStorage fallback.');
-        await loadSites();
-        return;
-      }
-
-      try {
-        const app = initializeApp(firebaseConfig);
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
-
-        await signInAnonymously(auth);
-
-        onAuthStateChanged(auth, async (user) => {
-          if (!user) return;
-          state.uid = user.uid;
-          state.firebaseReady = true;
-          await loadSites();
-        });
-      } catch (error) {
-        console.error('Firebase initialization failed. Falling back to localStorage.', error);
-        state.firebaseReady = false;
-        await loadSites();
-      }
-    }
-
     function getCookie(name) {
       return document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.split('=')[1];
     }
@@ -607,33 +586,18 @@
       }[char]));
     }
 
-    function hasEditAccess(site) {
-      if (!site) return false;
-      return Boolean(
-        site.ownerUid === state.uid ||
-        site.creatorId === creatorId() ||
-        (Array.isArray(site.collaborators) && site.collaborators.includes(state.uid))
-      );
-    }
-
-    function isPublicSite(site) {
-      return site?.isPublic !== false;
-    }
-
     function basePageUrl() {
       return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
     }
 
     function shareBase(site = state.current) {
-      const path = site?.customUrl || site?.siteId || slugify(site?.title);
+      const path = site?.siteId || 'unknown';
       return `${basePageUrl()}#/${path}`;
     }
 
-    function syncUrlForSite(site, { edit = false } = {}) {
-      if (!site) return;
-      const base = shareBase(site);
-      const next = edit && site.key ? `${base}/${site.key}` : base;
-      history.replaceState(null, '', next);
+    function currentShareUrl() {
+      const base = shareBase();
+      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
     }
 
     function parseHashRoute() {
@@ -644,16 +608,62 @@
       return { sitePath: sitePath || null, key };
     }
 
-    function currentShareUrl() {
-      const base = shareBase();
-      return state.shareMode === 'edit' && state.current?.key ? `${base}/${state.current.key}` : base;
-    }
-
     function setView(view) {
       els.home.classList.toggle('hidden', view !== 'home');
       els.viewer.classList.toggle('hidden', view !== 'viewer');
       els.editor.classList.toggle('hidden', view !== 'editor');
       els.addBar.classList.toggle('hidden', view !== 'editor');
+    }
+
+    function siteMatchesLegacyRoute(site, routeValue) {
+      if (!site || !routeValue) return false;
+      const candidates = [
+        site.customUrl,
+        site.siteId,
+        site.title,
+        slugify(site.title)
+      ].filter(Boolean).map(String);
+      return candidates.includes(String(routeValue));
+    }
+
+    async function initFirebase() {
+      if (!hasFirebaseConfig()) {
+        console.warn('Firebase config is empty. Using localStorage fallback.');
+        await loadSites();
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+
+        await signInAnonymously(auth);
+
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          state.uid = user.uid;
+          state.firebaseReady = true;
+          await loadSites();
+        });
+      } catch (error) {
+        console.error('Firebase initialization failed. Falling back to localStorage.', error);
+        state.firebaseReady = false;
+        await loadSites();
+      }
+    }
+
+    function isPublicSite(site) {
+      return site?.isPublic !== false;
+    }
+
+    function hasEditAccess(site) {
+      if (!site) return false;
+      return Boolean(
+        site.ownerUid === state.uid ||
+        site.creatorId === creatorId() ||
+        (Array.isArray(site.collaborators) && site.collaborators.includes(state.uid))
+      );
     }
 
     async function loadSites() {
@@ -662,7 +672,6 @@
       } else {
         state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       }
-
       renderSiteList();
       await openRouteFromHash();
     }
@@ -678,28 +687,25 @@
     async function resolveSiteByRoute(sitePath) {
       if (!sitePath) return null;
 
-      const localMatch = state.sites.find((site) => siteMatchesRoute(site, sitePath));
+      const localMatch = state.sites.find((site) => String(site.siteId) === String(sitePath));
       if (localMatch) return localMatch;
 
       if (state.firebaseReady && state.db) {
+        try {
+          const exactSnap = await getDoc(doc(state.db, 'websites', sitePath));
+          if (exactSnap.exists()) {
+            return { siteId: exactSnap.id, ...exactSnap.data() };
+          }
+        } catch (error) {
+          console.warn('Direct getDoc lookup failed, falling back to legacy search.', error);
+        }
+
         const snapshot = await getDocs(collection(state.db, 'websites'));
         const allSites = snapshot.docs.map((item) => ({ siteId: item.id, ...item.data() }));
-        return allSites.find((site) => siteMatchesRoute(site, sitePath)) || null;
+        return allSites.find((site) => siteMatchesLegacyRoute(site, sitePath)) || null;
       }
 
-      return null;
-    }
-
-    function siteMatchesRoute(site, routeValue) {
-      if (!site || !routeValue) return false;
-      const candidates = [
-        site.customUrl,
-        site.siteId,
-        site.title,
-        slugify(site.title)
-      ].filter(Boolean).map(String);
-
-      return candidates.includes(String(routeValue));
+      return state.sites.find((site) => siteMatchesLegacyRoute(site, sitePath)) || null;
     }
 
     function makeSite() {
@@ -723,55 +729,6 @@
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-    }
-
-    function openEditor(site, { syncHash = false, preferEditRoute = false } = {}) {
-      if (!site) return;
-
-      state.current = structuredClone(site);
-      state.editingBlockId = null;
-      els.title.value = state.current.title || '';
-      els.key.value = state.current.key || '';
-      els.customUrl.value = state.current.customUrl || '';
-      els.heading.textContent = state.current.title || '無題のサイト';
-      setView('editor');
-      renderBlocks();
-
-      if (syncHash) {
-        syncUrlForSite(state.current, { edit: preferEditRoute && Boolean(state.current.key) });
-      }
-    }
-
-    function showViewer(site, canEdit) {
-      state.current = structuredClone(site);
-      state.editingBlockId = null;
-      els.viewerTitle.textContent = site.title || '無題のサイト';
-      els.viewerCanvas.innerHTML = (site.blocks || [])
-        .map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`)
-        .join('') || '<div class="empty">本文がありません。</div>';
-      els.viewerEditBtn.classList.toggle('hidden', !canEdit);
-      setView('viewer');
-    }
-
-    function showAccessDenied() {
-      state.current = null;
-      els.viewerTitle.textContent = 'アクセスできません';
-      els.viewerCanvas.innerHTML = '<div class="empty">このページは非公開です。正しい閲覧リンクか共同編集Keyが必要です。</div>';
-      els.viewerEditBtn.classList.add('hidden');
-      setView('viewer');
-    }
-
-    function renderSiteList() {
-      if (!state.sites.length) {
-        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
-        return;
-      }
-
-      els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
-        const handshake = site.collaborative && mine ? '🤝 ' : '';
-        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
-      }).join('');
     }
 
     function sanitizeRichHtml(value) {
@@ -799,6 +756,19 @@
     function renderFormattedBlock(block) {
       return sanitizeRichHtml(block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>'))
         .replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    }
+
+    function renderSiteList() {
+      if (!state.sites.length) {
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
+        return;
+      }
+
+      els.siteList.innerHTML = state.sites.map((site) => {
+        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
+        const handshake = site.collaborative && mine ? '🤝 ' : '';
+        return `<button class="site-card" data-site="${site.siteId}"><strong>${handshake}${escapeHtml(site.title)}</strong><span>${shareBase(site)}</span></button>`;
+      }).join('');
     }
 
     function renderBlocks() {
@@ -868,6 +838,51 @@
       showAccessDenied();
     }
 
+    function syncUrlForSite(site, { edit = false } = {}) {
+      if (!site) return;
+      const base = shareBase(site);
+      const next = edit && site.key ? `${base}/${site.key}` : base;
+      history.replaceState(null, '', next);
+      state.routeSite = site.siteId;
+      state.routeKey = edit && site.key ? site.key : null;
+    }
+
+    function openEditor(site, { syncHash = false, preferEditRoute = false } = {}) {
+      if (!site) return;
+
+      state.current = structuredClone(site);
+      state.editingBlockId = null;
+      els.title.value = state.current.title || '';
+      els.key.value = state.current.key || '';
+      els.customUrl.value = state.current.customUrl || '';
+      els.heading.textContent = state.current.title || '無題のサイト';
+      setView('editor');
+      renderBlocks();
+
+      if (syncHash) {
+        syncUrlForSite(state.current, { edit: preferEditRoute && Boolean(state.current.key) });
+      }
+    }
+
+    function showViewer(site, canEdit) {
+      state.current = structuredClone(site);
+      state.editingBlockId = null;
+      els.viewerTitle.textContent = site.title || '無題のサイト';
+      els.viewerCanvas.innerHTML = (site.blocks || [])
+        .map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`)
+        .join('') || '<div class="empty">本文がありません。</div>';
+      els.viewerEditBtn.classList.toggle('hidden', !canEdit);
+      setView('viewer');
+    }
+
+    function showAccessDenied() {
+      state.current = null;
+      els.viewerTitle.textContent = 'アクセスできません';
+      els.viewerCanvas.innerHTML = '<div class="empty">このページは非公開です。正しい閲覧リンクか共同編集Keyが必要です。</div>';
+      els.viewerEditBtn.classList.add('hidden');
+      setView('viewer');
+    }
+
     async function saveSiteToFirestore(site) {
       const payload = {
         ...site,
@@ -917,11 +932,11 @@
       renderSiteList();
       renderBlocks();
 
-      const routeIsEdit = Boolean(state.current.key && state.routeKey && state.routeKey === state.current.key);
+      const keepEditRoute = Boolean(state.current.key && state.routeKey && state.routeKey === state.current.key);
       history.replaceState(
         null,
         '',
-        routeIsEdit ? `${shareBase(state.current)}/${state.current.key}` : shareBase(state.current)
+        keepEditRoute ? `${shareBase(state.current)}/${state.current.key}` : shareBase(state.current)
       );
 
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
