@@ -112,6 +112,7 @@
     .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
     .btn.ghost { background: transparent; }
     .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
 
     .site-grid {
       display: grid;
@@ -147,11 +148,7 @@
       word-break: break-all;
     }
 
-    .editor-layout {
-      display: grid;
-      gap: 16px;
-      align-items: start;
-    }
+    .editor-layout { display: grid; gap: 16px; align-items: start; }
 
     .editor-top, .viewer-top {
       display: flex;
@@ -161,17 +158,8 @@
       margin-bottom: 12px;
     }
 
-    .field {
-      display: grid;
-      gap: 7px;
-      margin: 12px 0;
-    }
-
-    .field label {
-      font-weight: 800;
-      font-size: .92rem;
-    }
-
+    .field { display: grid; gap: 7px; margin: 12px 0; }
+    .field label { font-weight: 800; font-size: .92rem; }
     .field input, .field textarea, .field select {
       width: 100%;
       border: 1px solid var(--line);
@@ -293,6 +281,8 @@
       background: #f2f4f7;
       color: var(--muted);
       overflow: hidden;
+      text-align: center;
+      padding: 12px;
     }
 
     .share-url {
@@ -315,11 +305,6 @@
       color: #fff;
       background: var(--accent);
       border-color: var(--accent);
-    }
-
-    .tab:disabled {
-      opacity: .45;
-      cursor: not-allowed;
     }
 
     .id-pill {
@@ -359,6 +344,22 @@
       border-color: #a7f3d0;
     }
 
+    .status-pill.warn {
+      color: #9a3412;
+      background: #fff7ed;
+      border-color: #fed7aa;
+    }
+
+    .inline-note {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+      line-height: 1.7;
+    }
+
     @media (max-width: 820px) {
       .hero, .editor-layout { grid-template-columns: 1fr; }
       .editor-top, .viewer-top { align-items: stretch; flex-direction: column; }
@@ -385,12 +386,13 @@
           <p>HTML、GitHub、Firebaseを知らなくても大丈夫。テキストブロックを追加して保存するだけで、共有できるWebページを作れます。</p>
           <div class="hero-actions">
             <button class="btn primary" id="newSiteBtn">＋ 新規作成</button>
+            <button class="btn" id="shareHomeBtn">共有</button>
             <button class="btn" id="showIdBtn">自分のIDを見る</button>
           </div>
         </div>
         <div class="panel">
           <h2>自分のサイト一覧</h2>
-          <p>この端末で作成・共同編集したサイトを表示します。Firebase設定前はブラウザ内に保存されます。</p>
+          <p>このアカウントで作成・共同編集できるサイトを表示します。完全Firebase版です。</p>
           <div class="site-grid" id="siteList"></div>
         </div>
       </div>
@@ -486,6 +488,7 @@
       </div>
       <div class="qr-box" id="qrBox">生成中…</div>
       <div class="share-url" id="shareUrl"></div>
+      <div id="shareMessage" class="inline-note hidden"></div>
       <div class="toolbar" style="margin-top:14px">
         <button class="btn" id="copyShareBtn">URLコピー</button>
         <button class="btn primary" id="webShareBtn">共有する</button>
@@ -497,7 +500,16 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      getDoc,
+      doc,
+      setDoc,
+      serverTimestamp,
+      arrayUnion
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: '',
@@ -508,20 +520,18 @@
       appId: ''
     };
 
-    const STORAGE_KEY = 'createwebsite:sites:v1';
-    const COOKIE_KEY = 'createwebsiteCreatorId';
     const $ = (selector) => document.querySelector(selector);
 
     const state = {
+      db: null,
+      uid: null,
+      ready: false,
       sites: [],
       current: null,
       editingBlockId: null,
-      shareMode: 'view',
-      uid: null,
-      db: null,
-      firebaseReady: false,
       routeSiteId: null,
-      routeKey: null
+      routeKey: null,
+      shareMode: 'view'
     };
 
     const els = {
@@ -545,8 +555,26 @@
       shareDialog: $('#shareDialog'),
       qrBox: $('#qrBox'),
       shareUrl: $('#shareUrl'),
-      shareTabs: $('#shareTabs')
+      shareTabs: $('#shareTabs'),
+      shareMessage: $('#shareMessage')
     };
+
+    function setView(view) {
+      els.home.classList.toggle('hidden', view !== 'home');
+      els.viewer.classList.toggle('hidden', view !== 'viewer');
+      els.editor.classList.toggle('hidden', view !== 'editor');
+      els.addBar.classList.toggle('hidden', view !== 'editor');
+    }
+
+    function showText(el, value) {
+      el.textContent = value;
+      el.classList.remove('hidden');
+    }
+
+    function hideText(el) {
+      el.textContent = '';
+      el.classList.add('hidden');
+    }
 
     function hasFirebaseConfig() {
       return Boolean(
@@ -566,22 +594,29 @@
     }
 
     function creatorId() {
-      let id = getCookie(COOKIE_KEY);
+      let id = getCookie('createwebsiteCreatorId');
       if (!id) {
         id = crypto.randomUUID().slice(0, 8);
-        setCookie(COOKIE_KEY, id);
+        setCookie('createwebsiteCreatorId', id);
       }
       return id;
     }
 
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>'"]/g, (char) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }[char]));
+    function normalizeSite(siteId, data = {}) {
+      return {
+        ...data,
+        siteId: siteId || data.siteId || crypto.randomUUID().slice(0, 8),
+        title: data.title || '無題のサイト',
+        ownerUid: data.ownerUid || 'anonymous-local-user',
+        creatorId: data.creatorId || creatorId(),
+        key: data.key || '',
+        isPublic: data.isPublic !== false,
+        collaborative: Boolean(data.collaborative || data.key),
+        collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
+        blocks: Array.isArray(data.blocks) ? data.blocks : [],
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString()
+      };
     }
 
     function basePageUrl() {
@@ -600,125 +635,43 @@
       return { siteId, key };
     }
 
-    function setView(view) {
-      els.home.classList.toggle('hidden', view !== 'home');
-      els.viewer.classList.toggle('hidden', view !== 'viewer');
-      els.editor.classList.toggle('hidden', view !== 'editor');
-      els.addBar.classList.toggle('hidden', view !== 'editor');
-    }
-
-    function normalizeSite(siteId, data = {}) {
-      return {
-        ...data,
-        siteId: siteId || data.siteId || crypto.randomUUID().slice(0, 8),
-        blocks: Array.isArray(data.blocks) ? data.blocks : [],
-        collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
-        isPublic: data.isPublic !== false,
-        collaborative: Boolean(data.collaborative || data.key),
-        title: data.title || '無題のサイト',
-        ownerUid: data.ownerUid || 'anonymous-local-user',
-        creatorId: data.creatorId || creatorId(),
-        key: data.key || '',
-        updatedAt: data.updatedAt || new Date().toISOString(),
-        createdAt: data.createdAt || new Date().toISOString()
-      };
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[char]));
     }
 
     function isPublicSite(site) {
       return site?.isPublic !== false;
     }
 
+    function isOwnedByMe(site) {
+      return Boolean(site && (site.ownerUid === state.uid || site.creatorId === creatorId()));
+    }
+
     function canEditSite(site) {
       if (!site) return false;
       return Boolean(
-        site.ownerUid === state.uid ||
-        site.creatorId === creatorId() ||
+        isOwnedByMe(site) ||
         (Array.isArray(site.collaborators) && site.collaborators.includes(state.uid))
       );
     }
 
-    async function initFirebase() {
-      if (!hasFirebaseConfig()) {
-        await loadSites();
-        return;
-      }
-
-      try {
-        const app = initializeApp(firebaseConfig);
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
-
-        await signInAnonymously(auth);
-        onAuthStateChanged(auth, async (user) => {
-          if (!user) return;
-          state.uid = user.uid;
-          state.firebaseReady = true;
-          await loadSites();
-        });
-      } catch (error) {
-        console.error('Firebase initialization failed. Falling back to localStorage.', error);
-        state.firebaseReady = false;
-        await loadSites();
-      }
+    function hasCurrentSite() {
+      return Boolean(state.current && state.current.siteId);
     }
 
-    async function loadSites() {
-      if (state.firebaseReady && state.db) {
-        await loadSitesFromFirestore();
-      } else {
-        state.sites = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').map((site) => normalizeSite(site.siteId, site));
-      }
-      renderSiteList();
-      await openRouteFromHash();
+    function isPersistedCurrentSite() {
+      if (!hasCurrentSite()) return false;
+      return state.sites.some((site) => site.siteId === state.current.siteId);
     }
 
-    async function loadSitesFromFirestore() {
-      const snapshot = await getDocs(collection(state.db, 'websites'));
-      state.sites = snapshot.docs
-        .map((item) => normalizeSite(item.id, item.data()))
-        .filter((site) => isPublicSite(site) || canEditSite(site))
-        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-    }
-
-    async function fetchSiteById(siteId) {
-      const local = state.sites.find((site) => site.siteId === siteId);
-      if (local) return normalizeSite(local.siteId, local);
-
-      if (state.firebaseReady && state.db && siteId) {
-        const snap = await getDoc(doc(state.db, 'websites', siteId));
-        if (snap.exists()) {
-          return normalizeSite(snap.id, snap.data());
-        }
-
-        const all = await getDocs(collection(state.db, 'websites'));
-        const legacy = all.docs
-          .map((d) => normalizeSite(d.id, d.data()))
-          .find((site) => site.siteId === siteId || site.customUrl === siteId);
-
-        if (legacy) return legacy;
-      }
-
-      return null;
-    }
-
-    function makeSite() {
-      return normalizeSite(crypto.randomUUID().slice(0, 8), {
-        title: '無題のサイト',
-        ownerUid: state.uid || 'anonymous-local-user',
-        creatorId: creatorId(),
-        key: '',
-        isPublic: true,
-        collaborative: false,
-        blocks: [
-          {
-            id: crypto.randomUUID(),
-            type: 'text',
-            html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
-          }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+    function currentSiteId() {
+      return state.current?.siteId || state.routeSiteId || '';
     }
 
     function sanitizeRichHtml(value) {
@@ -744,26 +697,47 @@
     }
 
     function renderFormattedBlock(block) {
-      return sanitizeRichHtml(block.html || escapeHtml(block.text || '').replace(/\n/g, '<br>'))
-        .replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+      const base = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
+      return sanitizeRichHtml(base).replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
     }
 
-    function renderSiteList() {
+    function makeSite() {
+      return normalizeSite(crypto.randomUUID().slice(0, 8), {
+        title: '無題のサイト',
+        ownerUid: state.uid || 'anonymous-local-user',
+        creatorId: creatorId(),
+        key: '',
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: 'text',
+            html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
+          }
+        ]
+      });
+    }
+
+    function renderHome() {
       if (!state.sites.length) {
-        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。${state.firebaseReady ? 'Firebaseに保存されます。' : 'Firebase未設定のため、このブラウザ内だけに保存されます。'}</p>`;
+        els.siteList.innerHTML = `<p class="empty">まだサイトがありません。「新規作成」から始めましょう。</p>`;
         return;
       }
 
-      els.siteList.innerHTML = state.sites.map((site) => {
-        const mine = site.creatorId === creatorId() || site.ownerUid === state.uid;
-        const handshake = site.collaborative && mine ? '🤝 ' : '';
-        return `
-          <button class="site-card" data-site="${site.siteId}">
-            <strong>${handshake}${escapeHtml(site.title)}</strong>
-            <span>${siteUrl(site.siteId)}</span>
-          </button>
-        `;
-      }).join('');
+      els.siteList.innerHTML = state.sites
+        .map((site) => {
+          const mine = isOwnedByMe(site);
+          const badge = site.collaborative && mine ? '🤝 ' : '';
+          return `
+            <button class="site-card" data-site="${site.siteId}">
+              <strong>${badge}${escapeHtml(site.title)}</strong>
+              <span>${siteUrl(site.siteId)}</span>
+            </button>
+          `;
+        })
+        .join('');
     }
 
     function renderBlocks() {
@@ -790,180 +764,12 @@
       `).join('');
     }
 
-    function currentSiteId() {
-      return state.current?.siteId || state.routeSiteId || '';
-    }
-
-    function currentShareUrl() {
-      const siteId = currentSiteId();
-      if (!siteId) return basePageUrl();
-      const key = state.shareMode === 'edit' && state.current?.key ? state.current.key : null;
-      return siteUrl(siteId, key);
-    }
-
-    function updateQr() {
-      const url = currentShareUrl();
-      els.shareUrl.textContent = url;
-      els.qrBox.innerHTML = '生成中…';
-      setTimeout(() => {
-        els.qrBox.innerHTML = '';
-        if (window.QRCode) {
-          new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
-        } else {
-          els.qrBox.textContent = 'QRライブラリを読み込めませんでした';
-        }
-      }, 180);
-    }
-
-    async function persistCurrent() {
-      if (!state.current) return;
-
-      if (state.firebaseReady && state.db) {
-        const payload = {
-          ...state.current,
-          siteId: state.current.siteId,
-          ownerUid: state.current.ownerUid || state.uid,
-          creatorId: state.current.creatorId || creatorId(),
-          collaborators: state.current.collaborators || [],
-          updatedAt: new Date().toISOString(),
-          updatedAtServer: serverTimestamp()
-        };
-        await setDoc(doc(state.db, 'websites', state.current.siteId), payload, { merge: true });
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sites));
-      }
-    }
-
-    async function saveCurrent() {
-      if (!state.current) return;
-
-      state.current.siteId = currentSiteId() || state.current.siteId || crypto.randomUUID().slice(0, 8);
-      state.current.title = els.title.value.trim() || '無題のサイト';
-      state.current.ownerUid = state.current.ownerUid === 'anonymous-local-user' && state.uid
-        ? state.uid
-        : state.current.ownerUid;
-      state.current.key = els.key.value.trim();
-      state.current.collaborative = Boolean(state.current.key);
-      state.current.updatedAt = new Date().toISOString();
-
-      const normalized = normalizeSite(state.current.siteId, state.current);
-      const index = state.sites.findIndex((site) => site.siteId === normalized.siteId);
-      if (index >= 0) state.sites[index] = structuredClone(normalized);
-      else state.sites.unshift(structuredClone(normalized));
-
-      state.current = structuredClone(normalized);
-
-      await persistCurrent();
-      renderSiteList();
-      renderBlocks();
-      history.replaceState(null, '', siteUrl(state.current.siteId));
-      alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
-    }
-
-    function openTextDialog(blockId = null) {
-      state.editingBlockId = blockId;
-      const block = state.current?.blocks?.find((item) => item.id === blockId);
-      els.textInput.innerHTML = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
-      els.textDialog.showModal();
-      requestAnimationFrame(() => els.textInput.focus());
-    }
-
-    async function addCollaboratorFromKey(site) {
-      if (!site?.key) return site;
-
-      const marker = state.uid || creatorId();
-      const collaborators = Array.from(new Set([...(site.collaborators || []), marker]));
-      const updated = normalizeSite(site.siteId, {
-        ...site,
-        collaborators,
-        collaborative: true
-      });
-
-      const index = state.sites.findIndex((item) => item.siteId === updated.siteId);
-      if (index >= 0) state.sites[index] = structuredClone(updated);
-      else state.sites.unshift(structuredClone(updated));
-
-      if (state.firebaseReady && state.db) {
-        await setDoc(doc(state.db, 'websites', updated.siteId), {
-          collaborators,
-          collaborative: true,
-          updatedAt: new Date().toISOString(),
-          updatedAtServer: serverTimestamp()
-        }, { merge: true });
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sites));
-      }
-
-      return updated;
-    }
-
-    function showMissingSite() {
-      els.viewerTitle.textContent = 'サイトが見つかりません';
-      els.viewerCanvas.innerHTML = '<div class="empty">このリンクのサイトは見つかりませんでした。</div>';
-      els.viewerEditBtn.classList.add('hidden');
-      els.viewerModePill.classList.add('hidden');
-      setView('viewer');
-    }
-
-    async function openRouteFromHash() {
-      const { siteId, key } = parseHashRoute();
-      state.routeSiteId = siteId;
-      state.routeKey = key;
-
-      if (!siteId) return;
-
-      const site = await fetchSiteById(siteId);
-      if (!site) {
-        showMissingSite();
-        return;
-      }
-
-      const keyOk = Boolean(key && site.key && key === site.key);
-      const editable = canEditSite(site);
-
-      if (keyOk) {
-        const updated = await addCollaboratorFromKey(site);
-        showViewer(updated, { canEdit: true, collaborative: true });
-        return;
-      }
-
-      if (editable) {
-        showViewer(site, { canEdit: true, collaborative: false });
-        return;
-      }
-
-      if (isPublicSite(site)) {
-        showViewer(site, { canEdit: false, collaborative: false });
-        return;
-      }
-
-      showMissingSite();
-    }
-
-    function openEditor(site, { syncHash = false } = {}) {
-      if (!site) return;
-
-      const normalized = normalizeSite(site.siteId, site);
-      state.current = structuredClone(normalized);
+    function renderViewer(site, { canEdit = false, collaborative = false } = {}) {
+      state.current = normalizeSite(site.siteId, site);
       state.editingBlockId = null;
-      els.title.value = state.current.title || '';
-      els.key.value = state.current.key || '';
-      els.heading.textContent = state.current.title || '無題のサイト';
-      setView('editor');
-      renderBlocks();
 
-      if (syncHash) {
-        history.replaceState(null, '', siteUrl(state.current.siteId));
-      }
-    }
-
-    function showViewer(site, { canEdit = false, collaborative = false } = {}) {
-      const normalized = normalizeSite(site.siteId, site);
-      state.current = structuredClone(normalized);
-      state.editingBlockId = null;
-      els.viewerTitle.textContent = normalized.title || '無題のサイト';
-
-      els.viewerCanvas.innerHTML = (normalized.blocks || [])
+      els.viewerTitle.textContent = state.current.title || '無題のサイト';
+      els.viewerCanvas.innerHTML = (state.current.blocks || [])
         .map((block) => `<article class="block"><div class="rendered-text">${renderFormattedBlock(block)}</div></article>`)
         .join('') || '<div class="empty">本文がありません。</div>';
 
@@ -975,7 +781,266 @@
       setView('viewer');
     }
 
-    $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite(), { syncHash: true }));
+    function renderEditor() {
+      if (!state.current) return;
+      els.title.value = state.current.title || '';
+      els.key.value = state.current.key || '';
+      els.heading.textContent = state.current.title || '無題のサイト';
+      setView('editor');
+      renderBlocks();
+    }
+
+    function renderNotFound() {
+      state.current = null;
+      els.viewerTitle.textContent = 'サイトが見つかりません';
+      els.viewerCanvas.innerHTML = '<div class="empty">このリンクのサイトは見つかりませんでした。</div>';
+      els.viewerEditBtn.classList.add('hidden');
+      els.viewerModePill.classList.add('hidden');
+      setView('viewer');
+    }
+
+    async function initFirebase() {
+      if (!hasFirebaseConfig()) {
+        els.siteList.innerHTML = `<p class="empty">Firebase設定が空です。ここにプロジェクト設定を入れると動きます。</p>`;
+        return;
+      }
+
+      const app = initializeApp(firebaseConfig);
+      state.db = getFirestore(app);
+      const auth = getAuth(app);
+
+      await signInAnonymously(auth);
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return;
+        state.uid = user.uid;
+        state.ready = true;
+        $('#authStatus').textContent = 'Firebase接続中';
+        $('#authStatus').classList.add('good');
+        await loadSites();
+      });
+    }
+
+    async function loadSites() {
+      if (!state.ready || !state.db) return;
+
+      const snapshot = await getDocs(collection(state.db, 'websites'));
+      state.sites = snapshot.docs
+        .map((item) => normalizeSite(item.id, item.data()))
+        .filter((site) => isOwnedByMe(site) || (Array.isArray(site.collaborators) && site.collaborators.includes(state.uid)))
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+
+      renderHome();
+      await openRouteFromHash();
+    }
+
+    async function fetchSiteById(siteId) {
+      if (!state.db || !siteId) return null;
+
+      const local = state.sites.find((site) => site.siteId === siteId);
+      if (local) return normalizeSite(local.siteId, local);
+
+      const snap = await getDoc(doc(state.db, 'websites', siteId));
+      if (snap.exists()) return normalizeSite(snap.id, snap.data());
+
+      const all = await getDocs(collection(state.db, 'websites'));
+      const legacy = all.docs
+        .map((d) => normalizeSite(d.id, d.data()))
+        .find((site) => site.siteId === siteId || site.customUrl === siteId);
+
+      return legacy || null;
+    }
+
+    async function saveCurrent() {
+      if (!state.current || !state.db || !state.uid) return;
+
+      state.current.title = els.title.value.trim() || '無題のサイト';
+      state.current.key = els.key.value.trim();
+      state.current.collaborative = Boolean(state.current.key);
+      state.current.ownerUid = state.current.ownerUid || state.uid;
+      state.current.creatorId = state.current.creatorId || creatorId();
+      state.current.updatedAt = new Date().toISOString();
+
+      const payload = {
+        ...state.current,
+        siteId: state.current.siteId,
+        ownerUid: state.current.ownerUid,
+        creatorId: state.current.creatorId,
+        collaborators: state.current.collaborators || [],
+        updatedAt: state.current.updatedAt,
+        updatedAtServer: serverTimestamp()
+      };
+
+      await setDoc(doc(state.db, 'websites', state.current.siteId), payload, { merge: true });
+
+      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
+      const normalized = normalizeSite(state.current.siteId, state.current);
+      if (index >= 0) state.sites[index] = normalized;
+      else state.sites.unshift(normalized);
+
+      state.current = normalized;
+      renderHome();
+      renderBlocks();
+      history.replaceState(null, '', siteUrl(state.current.siteId));
+      alert('保存しました。');
+    }
+
+    async function saveBlockList() {
+      if (!state.current || !state.db || !state.uid) return;
+      state.current.updatedAt = new Date().toISOString();
+      await setDoc(doc(state.db, 'websites', state.current.siteId), {
+        blocks: state.current.blocks,
+        updatedAt: state.current.updatedAt,
+        updatedAtServer: serverTimestamp()
+      }, { merge: true });
+
+      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
+      if (index >= 0) state.sites[index] = normalizeSite(state.current.siteId, state.current);
+      else state.sites.unshift(normalizeSite(state.current.siteId, state.current));
+    }
+
+    async function openSiteEditor(site) {
+      if (!site) return;
+      state.current = normalizeSite(site.siteId, site);
+      renderEditor();
+      history.replaceState(null, '', siteUrl(state.current.siteId));
+    }
+
+    function openNewSite() {
+      state.current = makeSite();
+      state.editingBlockId = null;
+      renderEditor();
+      history.replaceState(null, '', siteUrl(state.current.siteId));
+    }
+
+    function currentShareUrl() {
+      const siteId = currentSiteId();
+      if (!siteId) return basePageUrl();
+      const key = state.shareMode === 'edit' && state.current?.key ? state.current.key : null;
+      return siteUrl(siteId, key);
+    }
+
+    function renderShareDialog() {
+      const hasSite = hasCurrentSite();
+      const persisted = isPersistedCurrentSite();
+      const canShareEdit = Boolean(hasSite && state.current?.key);
+      const url = currentShareUrl();
+
+      els.shareUrl.textContent = url;
+      els.shareTabs.querySelector('[data-share="view"]').disabled = false;
+      els.shareTabs.querySelector('[data-share="edit"]').disabled = !canShareEdit;
+
+      if (!hasSite) {
+        els.shareMessage.textContent = 'まずはサイトを開くか新規作成してください。ここでは空の共有リンクだけ表示しています。';
+        els.shareMessage.classList.remove('hidden');
+        els.qrBox.textContent = '共有できるサイトがありません';
+        $('#copyShareBtn').disabled = true;
+        $('#webShareBtn').disabled = true;
+        return;
+      }
+
+      if (!persisted) {
+        els.shareMessage.textContent = 'まだ保存されていないので、他の端末では開けません。保存してから共有してください。';
+        els.shareMessage.classList.remove('hidden');
+      } else {
+        hideText(els.shareMessage);
+      }
+
+      $('#copyShareBtn').disabled = false;
+      $('#webShareBtn').disabled = false;
+
+      els.qrBox.innerHTML = '';
+      if (window.QRCode) {
+        new QRCode(els.qrBox, { text: url, width: 200, height: 200 });
+      } else {
+        els.qrBox.textContent = 'QRを生成できませんでした';
+      }
+    }
+
+    function openShareDialog() {
+      state.shareMode = 'view';
+      els.shareTabs.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
+      renderShareDialog();
+      els.shareDialog.showModal();
+    }
+
+    async function grantCollaboratorAccess(site) {
+      const marker = state.uid || creatorId();
+      const collaborators = Array.from(new Set([...(site.collaborators || []), marker]));
+      const updated = normalizeSite(site.siteId, {
+        ...site,
+        collaborators,
+        collaborative: true
+      });
+
+      await setDoc(doc(state.db, 'websites', updated.siteId), {
+        collaborators: arrayUnion(marker),
+        collaborative: true,
+        updatedAt: new Date().toISOString(),
+        updatedAtServer: serverTimestamp()
+      }, { merge: true });
+
+      const index = state.sites.findIndex((item) => item.siteId === updated.siteId);
+      if (index >= 0) state.sites[index] = updated;
+      else state.sites.unshift(updated);
+
+      return updated;
+    }
+
+    async function openRouteFromHash() {
+      const { siteId, key } = parseHashRoute();
+      state.routeSiteId = siteId;
+      state.routeKey = key;
+
+      if (!siteId) return;
+
+      const site = await fetchSiteById(siteId);
+      if (!site) {
+        renderNotFound();
+        return;
+      }
+
+      const keyOk = Boolean(key && site.key && key === site.key);
+      const editable = canEditSite(site);
+
+      if (keyOk) {
+        const updated = await grantCollaboratorAccess(site);
+        renderViewer(updated, { canEdit: true, collaborative: true });
+        return;
+      }
+
+      if (editable) {
+        renderViewer(site, { canEdit: true, collaborative: false });
+        return;
+      }
+
+      if (isPublicSite(site)) {
+        renderViewer(site, { canEdit: false, collaborative: false });
+        return;
+      }
+
+      renderNotFound();
+    }
+
+    function openTextDialog(blockId = null) {
+      state.editingBlockId = blockId;
+      const block = state.current?.blocks?.find((item) => item.id === blockId);
+      els.textInput.innerHTML = block?.html || escapeHtml(block?.text || '').replace(/\n/g, '<br>');
+      els.textDialog.showModal();
+      requestAnimationFrame(() => els.textInput.focus());
+    }
+
+    function showAuthNote() {
+      const note = $('#authStatus');
+      if (!note) return;
+      if (!state.ready) {
+        note.textContent = 'Firebase接続待ち';
+        note.classList.add('warn');
+      }
+    }
+
+    $('#newSiteBtn').addEventListener('click', () => openNewSite());
+    $('#shareHomeBtn').addEventListener('click', () => openShareDialog());
 
     $('#backBtn').addEventListener('click', async () => {
       history.replaceState(null, '', location.pathname);
@@ -989,17 +1054,14 @@
       await loadSites();
     });
 
-    $('#viewerEditBtn').addEventListener('click', () => {
-      if (state.current) openEditor(state.current, { syncHash: false });
+    $('#viewerEditBtn').addEventListener('click', async () => {
+      if (state.current && canEditSite(state.current)) {
+        renderEditor();
+      }
     });
 
-    $('#viewerShareBtn').addEventListener('click', () => {
-      if (!state.current) return;
-      state.shareMode = 'view';
-      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
-      els.shareDialog.showModal();
-      updateQr();
-    });
+    $('#viewerShareBtn').addEventListener('click', () => openShareDialog());
+    $('#shareBtn').addEventListener('click', () => openShareDialog());
 
     $('#saveBtn').addEventListener('click', () => saveCurrent());
     $('#addTextBtn').addEventListener('click', () => openTextDialog());
@@ -1031,7 +1093,13 @@
       els.heading.textContent = state.current.title || '無題のサイト';
     });
 
-    $('#applyTextBtn').addEventListener('click', () => {
+    els.key.addEventListener('input', () => {
+      if (!state.current) return;
+      state.current.key = els.key.value;
+      state.current.collaborative = Boolean(els.key.value.trim());
+    });
+
+    $('#applyTextBtn').addEventListener('click', async () => {
       if (!state.current) return;
 
       const html = sanitizeRichHtml(els.textInput.innerHTML.trim()) || '新しいテキスト';
@@ -1041,19 +1109,19 @@
       } else {
         state.current.blocks.push({ id: crypto.randomUUID(), type: 'text', html });
       }
+
       renderBlocks();
+      await saveBlockList();
     });
 
-    els.siteList.addEventListener('click', (event) => {
+    els.siteList.addEventListener('click', async (event) => {
       const card = event.target.closest('[data-site]');
       if (!card) return;
       const site = state.sites.find((item) => item.siteId === card.dataset.site);
-      if (site) {
-        openEditor(site, { syncHash: true });
-      }
+      if (site) await openSiteEditor(site);
     });
 
-    els.canvas.addEventListener('click', (event) => {
+    els.canvas.addEventListener('click', async (event) => {
       const blockEl = event.target.closest('[data-block]');
       const action = event.target.dataset.action;
       if (!blockEl || !action || !state.current) return;
@@ -1061,17 +1129,24 @@
       const index = state.current.blocks.findIndex((block) => block.id === blockEl.dataset.block);
       if (index < 0) return;
 
-      if (action === 'edit') openTextDialog(state.current.blocks[index].id);
+      if (action === 'edit') {
+        openTextDialog(state.current.blocks[index].id);
+      }
+
       if (action === 'copy') {
         state.current.blocks.splice(index + 1, 0, {
           ...structuredClone(state.current.blocks[index]),
           id: crypto.randomUUID()
         });
+        renderBlocks();
+        await saveBlockList();
       }
+
       if (action === 'delete' && confirm('このブロックを削除しますか？')) {
         state.current.blocks.splice(index, 1);
+        renderBlocks();
+        await saveBlockList();
       }
-      renderBlocks();
     });
 
     let dragId = null;
@@ -1090,7 +1165,7 @@
 
     els.canvas.addEventListener('dragover', (event) => event.preventDefault());
 
-    els.canvas.addEventListener('drop', (event) => {
+    els.canvas.addEventListener('drop', async (event) => {
       event.preventDefault();
       if (!state.current) return;
 
@@ -1104,44 +1179,58 @@
       const [moved] = state.current.blocks.splice(from, 1);
       state.current.blocks.splice(to, 0, moved);
       renderBlocks();
+      await saveBlockList();
     });
 
-    $('#shareBtn').addEventListener('click', () => {
-      if (!state.current) return;
-      state.shareMode = 'view';
-      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
-      els.shareDialog.showModal();
-      updateQr();
+    $('#copyShareBtn').addEventListener('click', async () => {
+      const text = currentShareUrl();
+      await navigator.clipboard?.writeText(text);
+      alert('コピーしました');
     });
 
-    $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
-
-    $('#copyShareBtn').addEventListener('click', () => {
-      navigator.clipboard?.writeText(currentShareUrl()).then(() => alert('コピーしました'));
-    });
-
-    $('#webShareBtn').addEventListener('click', () => {
-      if (!state.current) return;
+    $('#webShareBtn').addEventListener('click', async () => {
+      const text = currentShareUrl();
       if (navigator.share) {
-        navigator.share({ title: state.current.title, url: currentShareUrl() });
+        await navigator.share({ title: state.current?.title || 'CreateWebsite', url: text });
       } else {
         alert('このブラウザはWeb Share APIに対応していません。');
       }
     });
 
+    $('#closeShareBtn').addEventListener('click', () => els.shareDialog.close());
+
     els.shareTabs.addEventListener('click', (event) => {
-      if (!event.target.matches('.tab')) return;
-      state.shareMode = event.target.dataset.share;
-      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab === event.target));
-      updateQr();
+      const tab = event.target.closest('.tab');
+      if (!tab || tab.disabled) return;
+
+      state.shareMode = tab.dataset.share;
+      els.shareTabs.querySelectorAll('.tab').forEach((btn) => btn.classList.toggle('active', btn === tab));
+      renderShareDialog();
     });
 
     window.addEventListener('hashchange', () => {
       openRouteFromHash();
     });
 
+    function startupMessage() {
+      const status = $('#authStatus');
+      if (!status) return;
+
+      if (!hasFirebaseConfig()) {
+        status.textContent = 'Firebase未設定';
+        status.classList.add('warn');
+        return;
+      }
+
+      status.textContent = 'Firebase接続中';
+      status.classList.remove('warn');
+    }
+
     creatorId();
+    startupMessage();
     initFirebase();
   </script>
+
+  <div id="authStatus" class="status-pill warn" style="position:fixed;top:14px;right:14px;z-index:40;">Firebase接続待ち</div>
 </body>
 </html>
