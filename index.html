@@ -549,7 +549,12 @@
     };
 
     function hasFirebaseConfig() {
-      return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+      return Boolean(
+        firebaseConfig.apiKey &&
+        firebaseConfig.authDomain &&
+        firebaseConfig.projectId &&
+        firebaseConfig.appId
+      );
     }
 
     function getCookie(name) {
@@ -704,11 +709,13 @@
         key: '',
         isPublic: true,
         collaborative: false,
-        blocks: [{
-          id: crypto.randomUUID(),
-          type: 'text',
-          html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
-        }],
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: 'text',
+            html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'"
+          }
+        ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -839,9 +846,8 @@
       state.current.collaborative = Boolean(state.current.key);
       state.current.updatedAt = new Date().toISOString();
 
-      const index = state.sites.findIndex((site) => site.siteId === state.current.siteId);
       const normalized = normalizeSite(state.current.siteId, state.current);
-
+      const index = state.sites.findIndex((site) => site.siteId === normalized.siteId);
       if (index >= 0) state.sites[index] = structuredClone(normalized);
       else state.sites.unshift(structuredClone(normalized));
 
@@ -850,6 +856,7 @@
       await persistCurrent();
       renderSiteList();
       renderBlocks();
+      history.replaceState(null, '', siteUrl(state.current.siteId));
       alert(state.firebaseReady ? 'Firebaseに保存しました。' : '保存しました。Firebase設定後はFirestoreに保存されます。');
     }
 
@@ -894,18 +901,60 @@
       els.viewerTitle.textContent = 'サイトが見つかりません';
       els.viewerCanvas.innerHTML = '<div class="empty">このリンクのサイトは見つかりませんでした。</div>';
       els.viewerEditBtn.classList.add('hidden');
-      els.viewerShareBtn.classList.add('hidden');
       els.viewerModePill.classList.add('hidden');
       setView('viewer');
     }
 
-    function showAccessDenied() {
-      els.viewerTitle.textContent = 'アクセスできません';
-      els.viewerCanvas.innerHTML = '<div class="empty">このページは非公開です。正しい閲覧リンクか共同編集Keyが必要です。</div>';
-      els.viewerEditBtn.classList.add('hidden');
-      els.viewerShareBtn.classList.add('hidden');
-      els.viewerModePill.classList.add('hidden');
-      setView('viewer');
+    async function openRouteFromHash() {
+      const { siteId, key } = parseHashRoute();
+      state.routeSiteId = siteId;
+      state.routeKey = key;
+
+      if (!siteId) return;
+
+      const site = await fetchSiteById(siteId);
+      if (!site) {
+        showMissingSite();
+        return;
+      }
+
+      const keyOk = Boolean(key && site.key && key === site.key);
+      const editable = canEditSite(site);
+
+      if (keyOk) {
+        const updated = await addCollaboratorFromKey(site);
+        showViewer(updated, { canEdit: true, collaborative: true });
+        return;
+      }
+
+      if (editable) {
+        showViewer(site, { canEdit: true, collaborative: false });
+        return;
+      }
+
+      if (isPublicSite(site)) {
+        showViewer(site, { canEdit: false, collaborative: false });
+        return;
+      }
+
+      showMissingSite();
+    }
+
+    function openEditor(site, { syncHash = false } = {}) {
+      if (!site) return;
+
+      const normalized = normalizeSite(site.siteId, site);
+      state.current = structuredClone(normalized);
+      state.editingBlockId = null;
+      els.title.value = state.current.title || '';
+      els.key.value = state.current.key || '';
+      els.heading.textContent = state.current.title || '無題のサイト';
+      setView('editor');
+      renderBlocks();
+
+      if (syncHash) {
+        history.replaceState(null, '', siteUrl(state.current.siteId));
+      }
     }
 
     function showViewer(site, { canEdit = false, collaborative = false } = {}) {
@@ -919,7 +968,6 @@
         .join('') || '<div class="empty">本文がありません。</div>';
 
       els.viewerEditBtn.classList.toggle('hidden', !canEdit);
-      els.viewerShareBtn.classList.remove('hidden');
       els.viewerModePill.classList.toggle('hidden', !(canEdit || collaborative));
       els.viewerModePill.textContent = collaborative ? '共同編集モード' : (canEdit ? '編集可能' : '閲覧モード');
       els.viewerModePill.classList.toggle('good', collaborative || canEdit);
@@ -927,70 +975,9 @@
       setView('viewer');
     }
 
-    async function openRouteFromHash() {
-      const { siteId, key } = parseHashRoute();
-      state.routeSiteId = siteId;
-      state.routeKey = key;
-
-      if (!siteId) return;
-
-      const site = await fetchSiteById(siteId);
-
-      if (!site) {
-        showMissingSite();
-        return;
-      }
-
-      const keyOk = Boolean(key && site.key && key === site.key);
-      const editable = canEditSite(site);
-
-      let nextSite = site;
-      if (keyOk) {
-        nextSite = await addCollaboratorFromKey(site);
-      }
-
-      if (editable || keyOk) {
-        showViewer(normalizeSite(nextSite.siteId, nextSite), {
-          canEdit: true,
-          collaborative: keyOk
-        });
-        return;
-      }
-
-      if (isPublicSite(site)) {
-        showViewer(site, { canEdit: false, collaborative: false });
-        return;
-      }
-
-      showAccessDenied();
-    }
-
-    function openEditor(site, { syncHash = false } = {}) {
-      if (!site) return;
-
-      const normalized = normalizeSite(site.siteId, site);
-      state.current = structuredClone(normalized);
-      state.editingBlockId = null;
-      els.title.value = state.current.title || '';
-      els.key.value = state.current.key || '';
-      $('#editorHeading').textContent = state.current.title || '無題のサイト';
-      setView('editor');
-      renderBlocks();
-
-      if (syncHash) {
-        history.replaceState(null, '', siteUrl(state.current.siteId));
-      }
-    }
-
     $('#newSiteBtn').addEventListener('click', () => openEditor(makeSite(), { syncHash: true }));
 
     $('#backBtn').addEventListener('click', async () => {
-      if (state.current?.siteId) {
-        const keepKey = state.routeKey && state.routeKey === state.current.key ? state.current.key : null;
-        history.replaceState(null, '', siteUrl(state.current.siteId, keepKey));
-        showViewer(state.current, { canEdit: canEditSite(state.current), collaborative: Boolean(keepKey) });
-        return;
-      }
       history.replaceState(null, '', location.pathname);
       setView('home');
       await loadSites();
@@ -1010,7 +997,6 @@
       if (!state.current) return;
       state.shareMode = 'view';
       document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
-      els.shareTabs.querySelector('[data-share="edit"]').disabled = !state.current.key;
       els.shareDialog.showModal();
       updateQr();
     });
@@ -1042,13 +1028,7 @@
     els.title.addEventListener('input', () => {
       if (!state.current) return;
       state.current.title = els.title.value;
-      $('#editorHeading').textContent = state.current.title || '無題のサイト';
-    });
-
-    els.key.addEventListener('input', () => {
-      if (!state.current) return;
-      state.current.key = els.key.value.trim();
-      state.current.collaborative = Boolean(state.current.key);
+      els.heading.textContent = state.current.title || '無題のサイト';
     });
 
     $('#applyTextBtn').addEventListener('click', () => {
@@ -1068,13 +1048,9 @@
       const card = event.target.closest('[data-site]');
       if (!card) return;
       const site = state.sites.find((item) => item.siteId === card.dataset.site);
-      if (!site) return;
-
-      showViewer(site, {
-        canEdit: canEditSite(site),
-        collaborative: false
-      });
-      history.replaceState(null, '', siteUrl(site.siteId));
+      if (site) {
+        openEditor(site, { syncHash: true });
+      }
     });
 
     els.canvas.addEventListener('click', (event) => {
@@ -1134,7 +1110,6 @@
       if (!state.current) return;
       state.shareMode = 'view';
       document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.share === 'view'));
-      els.shareTabs.querySelector('[data-share="edit"]').disabled = !state.current.key;
       els.shareDialog.showModal();
       updateQr();
     });
@@ -1156,7 +1131,6 @@
 
     els.shareTabs.addEventListener('click', (event) => {
       if (!event.target.matches('.tab')) return;
-      if (event.target.disabled) return;
       state.shareMode = event.target.dataset.share;
       document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab === event.target));
       updateQr();
