@@ -2,355 +2,359 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CreateWebsite</title>
   <meta name="description" content="メモを書くようにサイトを作って共有できるサービス" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <style>
-    :root {
+    :root{
       color-scheme: light;
-      --bg: #f6f7fb;
-      --card: rgba(255, 255, 255, 0.92);
-      --ink: #1c2430;
-      --muted: #667085;
-      --line: #e4e7ec;
-      --brand: #5f63f2;
-      --brand-dark: #494de4;
-      --accent: #18a999;
-      --danger: #ef4444;
-      --shadow: 0 18px 50px rgba(28, 36, 48, 0.12);
-      --radius: 22px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg:#f6f7fb;
+      --card:rgba(255,255,255,.92);
+      --ink:#1c2430;
+      --muted:#667085;
+      --line:#e4e7ec;
+      --brand:#5f63f2;
+      --brand-dark:#494de4;
+      --accent:#18a999;
+      --danger:#ef4444;
+      --shadow:0 18px 50px rgba(28,36,48,.12);
+      --radius:22px;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      min-height:100vh;
       background:
-        radial-gradient(circle at top left, rgba(95, 99, 242, 0.18), transparent 34rem),
-        radial-gradient(circle at 100% 10%, rgba(24, 169, 153, 0.15), transparent 28rem),
+        radial-gradient(circle at top left, rgba(95,99,242,.18), transparent 34rem),
+        radial-gradient(circle at 100% 10%, rgba(24,169,153,.15), transparent 28rem),
         var(--bg);
-      color: var(--ink);
+      color:var(--ink);
     }
 
-    button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; border: 0; }
-    textarea { resize: vertical; }
+    button,input,textarea,select{ font:inherit; }
+    button{ cursor:pointer; border:0; }
+    textarea{ resize:vertical; }
 
-    .app-shell {
-      width: min(1120px, 100%);
-      margin: 0 auto;
-      padding: 20px 16px 112px;
-    }
-
-    .hidden { display: none !important; }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 18px;
-      align-items: stretch;
-      margin: 12px 0 20px;
+    .app-shell{
+      width:min(1120px,100%);
+      margin:0 auto;
+      padding:20px 16px 112px;
     }
 
-    .panel {
-      background: var(--card);
-      border: 1px solid rgba(255, 255, 255, 0.74);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 22px;
-      backdrop-filter: blur(14px);
+    .hidden{ display:none !important; }
+
+    .hero{
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:18px;
+      align-items:stretch;
+      margin:12px 0 20px;
     }
 
-    .eyebrow {
-      color: var(--brand);
-      font-weight: 800;
-      letter-spacing: .08em;
-      font-size: 0.78rem;
+    .panel{
+      background:var(--card);
+      border:1px solid rgba(255,255,255,.74);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+      backdrop-filter:blur(14px);
     }
 
-    h1, h2, h3 {
-      margin: 0;
-      line-height: 1.15;
+    .eyebrow{
+      color:var(--brand);
+      font-weight:800;
+      letter-spacing:.08em;
+      font-size:.78rem;
     }
 
-    h1 {
-      font-size: clamp(2rem, 7vw, 4.5rem);
-      letter-spacing: -0.06em;
-      margin-top: 8px;
+    h1,h2,h3{ margin:0; line-height:1.15; }
+    h1{
+      font-size:clamp(2rem,7vw,4.5rem);
+      letter-spacing:-.06em;
+      margin-top:8px;
+    }
+    h2{ font-size:clamp(1.35rem,4vw,2.1rem); }
+    h3{ font-size:1.15rem; }
+    p{ color:var(--muted); line-height:1.8; }
+
+    .hero-actions,.toolbar,.tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
     }
 
-    h2 { font-size: clamp(1.35rem, 4vw, 2.1rem); }
-    h3 { font-size: 1.15rem; }
-
-    p { color: var(--muted); line-height: 1.8; }
-
-    .hero-actions, .toolbar, .tabs {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
+    .btn{
+      min-height:44px;
+      border-radius:999px;
+      padding:0 18px;
+      font-weight:800;
+      background:#fff;
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--line);
     }
-
-    .btn {
-      min-height: 44px;
-      border-radius: 999px;
-      padding: 0 18px;
-      font-weight: 800;
-      background: #fff;
-      color: var(--ink);
-      box-shadow: inset 0 0 0 1px var(--line);
+    .btn.primary{
+      background:var(--brand);
+      color:#fff;
+      box-shadow:0 10px 24px rgba(95,99,242,.28);
     }
-    .btn.primary {
-      background: var(--brand);
-      color: #fff;
-      box-shadow: 0 10px 24px rgba(95, 99, 242, .28);
-    }
-    .btn.primary:hover { background: var(--brand-dark); }
-    .btn.danger { color: #fff; background: var(--danger); box-shadow: none; }
-    .btn.ghost { background: transparent; }
-    .btn.small { min-height: 36px; padding: 0 12px; font-size: .9rem; }
-    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary:hover{ background:var(--brand-dark); }
+    .btn.danger{ color:#fff; background:var(--danger); box-shadow:none; }
+    .btn.ghost{ background:transparent; }
+    .btn.small{ min-height:36px; padding:0 12px; font-size:.9rem; }
+    .btn:disabled{ opacity:.45; cursor:not-allowed; }
 
-    .site-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 14px;
-      margin-top: 16px;
+    .site-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+      gap:14px;
+      margin-top:16px;
     }
 
-    .site-card {
-      text-align: left;
-      width: 100%;
-      border-radius: 20px;
-      padding: 16px;
-      background: #fff;
-      border: 1px solid var(--line);
-      transition: transform .15s, box-shadow .15s;
+    .site-card{
+      text-align:left;
+      width:100%;
+      border-radius:20px;
+      padding:16px;
+      background:#fff;
+      border:1px solid var(--line);
+      transition:transform .15s, box-shadow .15s;
     }
-    .site-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 14px 30px rgba(28, 36, 48, .1);
+    .site-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 14px 30px rgba(28,36,48,.1);
     }
-    .site-card strong {
-      display: block;
-      font-size: 1.08rem;
-      margin-bottom: 8px;
+    .site-card strong{
+      display:block;
+      font-size:1.08rem;
+      margin-bottom:8px;
     }
-    .site-card span {
-      color: var(--muted);
-      font-size: .9rem;
-      word-break: break-all;
-    }
-
-    .editor-layout { display: grid; gap: 16px; align-items: start; }
-    .editor-top, .viewer-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 12px;
+    .site-card span{
+      color:var(--muted);
+      font-size:.9rem;
+      word-break:break-all;
     }
 
-    .field {
-      display: grid;
-      gap: 7px;
-      margin: 12px 0;
-    }
-    .field label {
-      font-weight: 800;
-      font-size: .92rem;
-    }
-    .field input, .field textarea, .field select {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 12px 14px;
-      background: #fff;
-      color: var(--ink);
+    .editor-layout{ display:grid; gap:16px; align-items:start; }
+    .editor-top,.viewer-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:12px;
     }
 
-    .canvas {
-      min-height: 52vh;
-      padding: 18px;
-      background: rgba(255,255,255,.58);
-      border: 1px dashed #cdd3df;
-      border-radius: var(--radius);
+    .field{
+      display:grid;
+      gap:7px;
+      margin:12px 0;
+    }
+    .field label{
+      font-weight:800;
+      font-size:.92rem;
+    }
+    .field input,.field textarea,.field select{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      color:var(--ink);
     }
 
-    .empty {
-      text-align: center;
-      padding: 60px 14px;
-      color: var(--muted);
+    .canvas{
+      min-height:52vh;
+      padding:18px;
+      background:rgba(255,255,255,.58);
+      border:1px dashed #cdd3df;
+      border-radius:var(--radius);
     }
 
-    .block {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px;
-      margin-bottom: 12px;
+    .empty{
+      text-align:center;
+      padding:60px 14px;
+      color:var(--muted);
     }
 
-    .block-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
+    .block{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+      margin-bottom:12px;
     }
 
-    .rendered-text {
-      white-space: pre-wrap;
-      line-height: 1.8;
-      word-break: break-word;
+    .block-head{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+      margin-bottom:8px;
     }
 
-    .rich-editor {
-      min-height: 180px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 12px 14px;
-      background: #fff;
-      line-height: 1.8;
-      outline: none;
-    }
-    .rich-editor:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 4px rgba(95,99,242,.12);
+    .rendered-text{
+      white-space:pre-wrap;
+      line-height:1.8;
+      word-break:break-word;
     }
 
-    .bottom-add-bar {
-      position: fixed;
-      left: 50%;
-      bottom: 14px;
-      transform: translateX(-50%);
-      width: min(760px, calc(100% - 28px));
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px;
-      background: rgba(255,255,255,.94);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      box-shadow: var(--shadow);
-      z-index: 30;
+    .rich-editor{
+      min-height:180px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      line-height:1.8;
+      outline:none;
     }
-    .bottom-add-bar span {
-      color: var(--muted);
-      font-weight: 700;
-      padding-left: 12px;
+    .rich-editor:focus{
+      border-color:var(--brand);
+      box-shadow:0 0 0 4px rgba(95,99,242,.12);
     }
 
-    dialog {
-      width: min(620px, calc(100% - 24px));
-      border: 0;
-      border-radius: 26px;
-      padding: 0;
-      box-shadow: var(--shadow);
+    .bottom-add-bar{
+      position:fixed;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      width:min(760px, calc(100% - 28px));
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:12px;
+      background:rgba(255,255,255,.94);
+      border:1px solid var(--line);
+      border-radius:999px;
+      box-shadow:var(--shadow);
+      z-index:30;
     }
-    dialog::backdrop {
-      background: rgba(15, 23, 42, .42);
-      backdrop-filter: blur(4px);
-    }
-    .dialog-body { padding: 22px; }
-    .qr-box {
-      width: 220px;
-      height: 220px;
-      display: grid;
-      place-items: center;
-      margin: 10px auto 16px;
-      border-radius: 20px;
-      background: #f2f4f7;
-      color: var(--muted);
-      overflow: hidden;
-    }
-    .share-url {
-      word-break: break-all;
-      background: #f8fafc;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 12px;
-    }
-    .tab {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 9px 14px;
-      font-weight: 800;
-    }
-    .tab.active {
-      color: #fff;
-      background: var(--accent);
-      border-color: var(--accent);
-    }
-    .tab:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-    .id-pill {
-      display: inline-flex;
-      gap: 8px;
-      align-items: center;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 8px 12px;
-    }
-    .notice {
-      background: #eef2ff;
-      color: #3730a3;
-      border-radius: 16px;
-      padding: 12px;
-      line-height: 1.7;
+    .bottom-add-bar span{
+      color:var(--muted);
+      font-weight:700;
+      padding-left:12px;
     }
 
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--muted);
-      font-weight: 800;
-      font-size: .88rem;
+    dialog{
+      width:min(620px, calc(100% - 24px));
+      border:0;
+      border-radius:26px;
+      padding:0;
+      box-shadow:var(--shadow);
     }
-    .status-pill.good {
-      color: #0f766e;
-      background: #ecfdf5;
-      border-color: #a7f3d0;
+    dialog::backdrop{
+      background:rgba(15,23,42,.42);
+      backdrop-filter:blur(4px);
     }
-    .status-pill.warn {
-      color: #92400e;
-      background: #fffbeb;
-      border-color: #fcd34d;
+    .dialog-body{ padding:22px; }
+    .qr-box{
+      width:220px;
+      height:220px;
+      display:grid;
+      place-items:center;
+      margin:10px auto 16px;
+      border-radius:20px;
+      background:#f2f4f7;
+      color:var(--muted);
+      overflow:hidden;
     }
-    .status-pill.bad {
-      color: #991b1b;
-      background: #fef2f2;
-      border-color: #fecaca;
+    .share-url{
+      word-break:break-all;
+      background:#f8fafc;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+    }
+    .tab{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:9px 14px;
+      font-weight:800;
+    }
+    .tab.active{
+      color:#fff;
+      background:var(--accent);
+      border-color:var(--accent);
+    }
+    .tab:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+    .id-pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:8px 12px;
+    }
+    .notice{
+      background:#eef2ff;
+      color:#3730a3;
+      border-radius:16px;
+      padding:12px;
+      line-height:1.7;
     }
 
-    @media (max-width: 820px) {
-      .hero, .editor-layout { grid-template-columns: 1fr; }
-      .editor-top, .viewer-top {
-        align-items: stretch;
-        flex-direction: column;
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--muted);
+      font-weight:800;
+      font-size:.88rem;
+    }
+    .status-pill.good{
+      color:#0f766e;
+      background:#ecfdf5;
+      border-color:#a7f3d0;
+    }
+    .status-pill.warn{
+      color:#92400e;
+      background:#fffbeb;
+      border-color:#fcd34d;
+    }
+    .status-pill.bad{
+      color:#991b1b;
+      background:#fef2f2;
+      border-color:#fecaca;
+    }
+
+    .input-search{
+      width:100%;
+      min-width:220px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      color:var(--ink);
+    }
+
+    @media (max-width:820px){
+      .hero,.editor-layout{ grid-template-columns:1fr; }
+      .editor-top,.viewer-top{
+        align-items:stretch;
+        flex-direction:column;
       }
-      .toolbar .btn { flex: 1; }
-      .bottom-add-bar {
-        border-radius: 24px;
-        align-items: stretch;
-        flex-direction: column;
+      .toolbar .btn{ flex:1; }
+      .bottom-add-bar{
+        border-radius:24px;
+        align-items:stretch;
+        flex-direction:column;
       }
-      .bottom-add-bar span {
-        padding-left: 0;
-        text-align: center;
+      .bottom-add-bar span{
+        padding-left:0;
+        text-align:center;
       }
     }
   </style>
@@ -406,7 +410,6 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
     import {
       getFirestore,
@@ -425,8 +428,8 @@
       projectId: "createwebsite-274dd",
       storageBucket: "createwebsite-274dd.firebasestorage.app",
       messagingSenderId: "646970295160",
-      appId: "1:646970295160:web:0d69e947b619286282be8d",
-      measurementId: "G-RP1KY3G2RQ"
+      appId: "1:646970295160:web:a3f9b6f07c067a1782be8d",
+      measurementId: "G-RN71HFCTGL"
     };
 
     const COLLECTION = "websites";
@@ -446,19 +449,17 @@
 
     const state = {
       db: null,
-      auth: null,
       uid: "",
       ready: false,
       mode: "loading", // loading | home | viewer | editor | missing | denied
       homeSites: [],
+      homeSearch: "",
       homeTab: "mine",
       current: null,
       currentSaved: false,
       currentAccess: "view", // view | owner | collaborator | key
       editingBlockId: null,
-      shareMode: "view",
-      bootError: "",
-      homeStatus: "Firebase接続中…"
+      shareMode: "view"
     };
 
     function uid8() {
@@ -536,22 +537,18 @@
 
     function parseRoute() {
       const hash = decodeURI(location.hash || "");
-      if (!hash.startsWith("#/")) return { name: "home" };
-      const parts = hash.slice(2).split("/").filter(Boolean);
-      if (!parts.length) return { name: "home" };
-      if (parts[0] === "create") return { name: "create" };
-      if (parts[0] === "edit" && parts[1]) return { name: "edit", id: decodeURIComponent(parts[1]) };
-      return { name: "site", id: decodeURIComponent(parts[0]), key: parts[1] ? decodeURIComponent(parts[1]) : null };
+      if (!hash.startsWith("#/")) return { siteId: null, key: null, name: "home" };
+      const [siteId = null, key = null] = hash.slice(2).split("/");
+      if (siteId === "create") return { name: "create" };
+      return { siteId, key, name: "site" };
     }
 
     function normalizeSite(siteId, data = {}) {
       return {
-        ...data,
         siteId: siteId || data.siteId || uid8(),
         title: data.title || "無題のサイト",
         key: data.key || "",
         ownerUid: data.ownerUid || "",
-        ownerToken: data.ownerToken || "",
         creatorId: data.creatorId || creatorId(),
         collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
         blocks: Array.isArray(data.blocks) ? data.blocks : [],
@@ -564,10 +561,7 @@
 
     function isMine(site) {
       if (!site) return false;
-      return Boolean(
-        (site.ownerUid && site.ownerUid === state.uid) ||
-        (site.ownerToken && site.ownerToken === creatorId())
-      );
+      return Boolean(site.ownerUid && site.ownerUid === state.uid);
     }
 
     function isCollaborator(site) {
@@ -589,8 +583,11 @@
     }
 
     function setHomeStatus(text, kind = "") {
-      const cls = kind === "good" ? "status-pill good" : kind === "warn" ? "status-pill warn" : kind === "bad" ? "status-pill bad" : "status-pill";
-      return `<span class="${cls}">${esc(text)}</span>`;
+      const className =
+        kind === "good" ? "status-pill good" :
+        kind === "warn" ? "status-pill warn" :
+        kind === "bad" ? "status-pill bad" : "status-pill";
+      return `<span class="${className}">${esc(text)}</span>`;
     }
 
     function siteSearchText(site) {
@@ -620,17 +617,14 @@
         .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     }
 
-    function setStateToSite(site, saved = true) {
-      state.current = site ? normalizeSite(site.siteId, site) : null;
-      state.currentSaved = !!saved;
-      state.editingBlockId = null;
-    }
-
     function renderHome() {
-      const mine = filterSites(mineSites(), state.homeSearch || "");
-      const pub = filterSites(publicSites(), state.homeSearch || "");
-      const list = state.homeTab === "mine" ? mine : pub;
+      const mine = filterSites(mineSites(), state.homeSearch);
+      const pub = filterSites(publicSites(), state.homeSearch);
 
+      const tabMine = state.homeTab === "mine" ? "active" : "";
+      const tabPub = state.homeTab === "public" ? "active" : "";
+
+      const list = state.homeTab === "mine" ? mine : pub;
       const listHtml = list.length
         ? list.map((site) => {
             const badge = isMine(site) ? "自分" : isCollaborator(site) ? "共同編集" : "公開";
@@ -644,7 +638,7 @@
         : `<p class="empty">${state.homeTab === "mine" ? "まだサイトがありません。" : "公開サイトがありません。"}</p>`;
 
       appRoot.innerHTML = `
-        <section class="hero">
+        <div class="hero">
           <div class="panel">
             <div class="eyebrow">CreateWebsite</div>
             <h1>メモを書くように、サイトを作ろう。</h1>
@@ -659,15 +653,15 @@
             <h2>自分のサイト一覧</h2>
             <p>このアカウントが作成したサイトと、共同編集者として追加されたサイトを表示します。</p>
             <div class="toolbar" style="margin:8px 0 12px">
-              <button class="tab ${state.homeTab === "mine" ? "active" : ""}" data-home-tab="mine" type="button">自分のサイト</button>
-              <button class="tab ${state.homeTab === "public" ? "active" : ""}" data-home-tab="public" type="button">公開サイト</button>
-              <input id="homeSearchInput" class="input" style="flex:1;min-width:220px" type="text" placeholder="検索" value="${esc(state.homeSearch || "")}">
+              <button class="tab ${tabMine}" data-home-tab="mine" type="button">自分のサイト</button>
+              <button class="tab ${tabPub}" data-home-tab="public" type="button">公開サイト</button>
+              <input id="homeSearchInput" class="input-search" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
               <button class="btn" id="homeRefreshBtn" type="button">↻</button>
             </div>
-            ${setHomeStatus(state.homeStatus, state.ready ? "good" : "warn")}
+            ${setHomeStatus(state.ready ? "Firebaseに接続しました。" : "Firebase接続中…", state.ready ? "good" : "warn")}
             <div class="site-grid" id="siteList">${listHtml}</div>
           </div>
-        </section>
+        </div>
       `;
     }
 
@@ -679,16 +673,16 @@
         </article>
       `).join("");
 
-      const status = canEditCurrent()
+      const statusHtml = canEditCurrent()
         ? setHomeStatus(state.currentAccess === "key" ? "共同編集モード" : "編集可能", "good")
         : setHomeStatus("閲覧モード", "warn");
 
       appRoot.innerHTML = `
-        <section class="panel">
+        <div class="panel">
           <div class="viewer-top">
             <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
             <div class="toolbar" style="justify-content:flex-end">
-              ${status}
+              ${statusHtml}
               <button class="btn" id="viewerShareBtn">共有</button>
               <button class="btn primary" id="viewerEditBtn" ${canEditCurrent() ? "" : "hidden"}>編集する</button>
             </div>
@@ -697,7 +691,7 @@
           <div class="canvas" style="margin-top:14px">
             ${blocks || '<div class="empty">本文がありません。</div>'}
           </div>
-        </section>
+        </div>
       `;
     }
 
@@ -719,21 +713,23 @@
         </article>
       `).join("");
 
+      const backLabel = state.currentSaved ? "← 戻る" : "← 一覧へ";
+
       appRoot.innerHTML = `
-        <section class="editor-top">
+        <div class="editor-top">
           <div>
-            <button class="btn ghost" id="backBtn">${state.currentSaved ? "← 戻る" : "← 一覧へ"}</button>
+            <button class="btn ghost" id="backBtn">${backLabel}</button>
             <h2 id="editorHeading">${esc(site?.title || "無題のサイト")}</h2>
           </div>
           <div class="toolbar">
             <button class="btn" id="shareBtn">共有</button>
             <button class="btn primary" id="saveBtn">保存</button>
           </div>
-        </section>
+        </div>
 
         <div class="editor-layout">
           <section class="panel">
-            <h3>公開設定</h3>
+            <h3>共同編集設定</h3>
             <p class="notice">Keyがあるリンクを開くと、その人が共同編集者として追加されます。</p>
             <div class="field">
               <label for="titleInput">サイトタイトル</label>
@@ -742,12 +738,6 @@
             <div class="field">
               <label for="editKeyInput">共同編集Key</label>
               <input id="editKeyInput" placeholder="例：abc123" value="${esc(site?.key || "")}">
-            </div>
-            <div class="field">
-              <label style="display:flex;gap:10px;align-items:center;cursor:pointer">
-                <input id="publicToggle" type="checkbox" ${site?.isPublic !== false ? "checked" : ""}>
-                <span>公開サイトにする</span>
-              </label>
             </div>
           </section>
 
@@ -764,7 +754,7 @@
 
     function renderLoading() {
       appRoot.innerHTML = `
-        <section class="hero">
+        <div class="hero">
           <div class="panel">
             <div class="eyebrow">CreateWebsite</div>
             <h1>読み込み中…</h1>
@@ -776,18 +766,18 @@
           </div>
           <div class="panel">
             <h2>準備中</h2>
-            <p>${esc(state.bootError || "接続を待っています。")}</p>
+            <p>${esc(state.errorMessage || "接続を待っています。")}</p>
             <div class="site-grid">
               <div class="empty">しばらくしても動かない場合は Firebase 設定を確認してね。</div>
             </div>
           </div>
-        </section>
+        </div>
       `;
     }
 
-    function showMissingDoc(message = "このリンクのサイトは見つかりませんでした。") {
+    function renderMissingScreen(message = "このリンクのサイトは見つかりませんでした。") {
       appRoot.innerHTML = `
-        <section class="panel">
+        <div class="panel">
           <div class="viewer-top">
             <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
           </div>
@@ -795,13 +785,13 @@
           <div class="canvas" style="margin-top:14px">
             <div class="empty">${esc(message)}</div>
           </div>
-        </section>
+        </div>
       `;
     }
 
-    function showDeniedDoc() {
+    function renderDeniedScreen() {
       appRoot.innerHTML = `
-        <section class="panel">
+        <div class="panel">
           <div class="viewer-top">
             <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
           </div>
@@ -809,7 +799,7 @@
           <div class="canvas" style="margin-top:14px">
             <div class="empty">このサイトは非公開です。正しい閲覧リンクか共同編集Keyが必要です。</div>
           </div>
-        </section>
+        </div>
       `;
     }
 
@@ -818,17 +808,16 @@
       else if (state.mode === "home") renderHome();
       else if (state.mode === "viewer") renderViewer();
       else if (state.mode === "editor") renderEditor();
-      else if (state.mode === "missing") showMissingDoc();
-      else if (state.mode === "denied") showDeniedDoc();
+      else if (state.mode === "missing") renderMissingScreen();
+      else if (state.mode === "denied") renderDeniedScreen();
     }
 
-    function createDraftSite() {
+    function makeDraftSite() {
       const id = uid8();
       return normalizeSite(id, {
         siteId: id,
         title: "無題のサイト",
         ownerUid: state.uid,
-        ownerToken: creatorId(),
         creatorId: creatorId(),
         key: "",
         blocks: [
@@ -852,8 +841,17 @@
     async function loadSiteById(siteId) {
       if (!state.db || !siteId) return null;
       const snap = await getDoc(doc(state.db, COLLECTION, siteId));
-      if (!snap.exists()) return null;
-      return normalizeSite(snap.id, snap.data() || {});
+      if (snap.exists()) return normalizeSite(snap.id, snap.data() || {});
+      const all = await getDocs(collection(state.db, COLLECTION));
+      return all.docs
+        .map((d) => normalizeSite(d.id, d.data() || {}))
+        .find((site) => site.siteId === siteId || site.title === siteId) || null;
+    }
+
+    function setCurrentSite(site, saved = true) {
+      state.current = site ? structuredClone(normalizeSite(site.siteId, site)) : null;
+      state.currentSaved = !!saved;
+      state.editingBlockId = null;
     }
 
     function openHome() {
@@ -862,14 +860,14 @@
     }
 
     function openViewer(site, access = "view") {
-      setStateToSite(site, true);
+      setCurrentSite(site, true);
       state.currentAccess = access;
       state.mode = "viewer";
       render();
     }
 
     function openEditor(site, saved = true, access = "view") {
-      setStateToSite(site, saved);
+      setCurrentSite(site, saved);
       state.currentAccess = access;
       state.mode = "editor";
       render();
@@ -877,7 +875,7 @@
 
     function openNewDraft() {
       if (!state.ready) return;
-      const draft = createDraftSite();
+      const draft = makeDraftSite();
       openEditor(draft, false, "owner");
       location.hash = "#/create";
     }
@@ -918,19 +916,15 @@
 
       const titleInput = document.getElementById("titleInput");
       const keyInput = document.getElementById("editKeyInput");
-      const publicToggle = document.getElementById("publicToggle");
 
       const title = String(titleInput?.value || "").trim() || "無題のサイト";
       const key = String(keyInput?.value || "").trim();
-      const isPublic = !!publicToggle?.checked;
 
       state.current.title = title;
       state.current.key = key;
-      state.current.isPublic = isPublic;
       state.current.collaborative = Boolean(key);
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
-      state.current.ownerToken = state.current.ownerToken || creatorId();
       state.current.creatorId = state.current.creatorId || creatorId();
 
       const payload = {
@@ -952,7 +946,6 @@
 
     async function openSiteById(siteId, key = null) {
       if (!state.ready) return;
-
       const site = await loadSiteById(siteId);
       if (!site) {
         state.mode = "missing";
@@ -961,28 +954,30 @@
         return;
       }
 
-      let access = "view";
-
-      if ((site.ownerUid && site.ownerUid === state.uid) || (site.ownerToken && site.ownerToken === creatorId())) {
-        access = "owner";
-      } else if (Array.isArray(site.collaborators) && site.collaborators.includes(state.uid)) {
-        access = "collaborator";
-      }
-
       if (key && site.key && key === site.key) {
-        access = "key";
         try {
           await updateDoc(doc(state.db, COLLECTION, site.siteId), {
-            collaborators: arrayUnion(state.uid)
+            collaborators: arrayUnion(state.uid),
+            collaborative: true
           });
+          site.collaborators = Array.from(new Set([...(site.collaborators || []), state.uid]));
+          site.collaborative = true;
+          state.currentAccess = "key";
         } catch (error) {
-          console.warn("Could not add collaborator:", error);
+          console.error(error);
+          state.currentAccess = "key";
+          alert("共同編集者の登録に失敗しました。Firestoreルールを確認してね。");
         }
-        site.collaborators = Array.from(new Set([...(site.collaborators || []), state.uid]));
+      } else if (isMine(site)) {
+        state.currentAccess = "owner";
+      } else if (isCollaborator(site)) {
+        state.currentAccess = "collaborator";
+      } else {
+        state.currentAccess = "view";
       }
 
-      setStateToSite(site, true);
-      state.currentAccess = access;
+      state.current = site;
+      state.currentSaved = true;
 
       if (site.isPublic === false && !canEditCurrent()) {
         state.mode = "denied";
@@ -992,6 +987,11 @@
 
       state.mode = "viewer";
       render();
+    }
+
+    async function refreshHomeSites() {
+      await loadAllSites();
+      if (state.mode === "home") render();
     }
 
     function openShareDialog() {
@@ -1014,7 +1014,6 @@
     function syncShareDialog() {
       const url = currentShareUrl();
       shareUrlEl.textContent = url || "保存後に共有リンクが出るよ";
-
       if (!state.current) {
         shareNoticeEl.textContent = "先にサイトを開いてください。";
       } else if (!state.currentSaved) {
@@ -1038,41 +1037,41 @@
       }, 120);
     }
 
-    async function bootstrap() {
-      state.mode = "loading";
-      render();
-
+    async function initFirebase() {
       if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
         state.ready = false;
-        state.bootError = "Firebase設定がありません。firebaseConfig を入れてください。";
-        state.homeStatus = "Firebase設定がありません。";
         state.mode = "loading";
+        state.errorMessage = "Firebase設定がありません。firebaseConfig を入れてください。";
         render();
         return;
       }
 
       try {
         const app = initializeApp(firebaseConfig);
-        try { getAnalytics(app); } catch (err) { console.warn("Analytics skipped:", err); }
         state.db = getFirestore(app);
-        state.auth = getAuth(app);
+        const auth = getAuth(app);
 
-        const cred = await signInAnonymously(state.auth);
-        state.uid = cred.user?.uid || state.auth.currentUser?.uid || "";
+        const timeout = setTimeout(() => {
+          if (!state.ready) {
+            state.errorMessage = "Firebase接続に時間がかかっています…";
+            state.mode = "loading";
+            render();
+          }
+        }, 10000);
+
+        const cred = await signInAnonymously(auth);
+        clearTimeout(timeout);
+
+        state.uid = cred.user?.uid || auth.currentUser?.uid || "";
         state.ready = true;
-        state.bootError = "";
-        state.homeStatus = "Firebaseに接続しました。";
-
+        state.errorMessage = "";
         await loadAllSites();
 
         const route = parseRoute();
         if (route.name === "site") {
-          await openSiteById(route.id, route.key || null);
+          await openSiteById(route.siteId, route.key || null);
         } else if (route.name === "create") {
           openNewDraft();
-        } else if (route.name === "edit") {
-          await openSiteById(route.id, null);
-          if (state.current) openEditor(state.current, true, canEditCurrent() ? state.currentAccess : "view");
         } else {
           state.mode = "home";
           render();
@@ -1080,8 +1079,7 @@
       } catch (error) {
         console.error(error);
         state.ready = false;
-        state.bootError = "Firebase接続に失敗しました。認証や設定を確認してください。";
-        state.homeStatus = "Firebase接続に失敗しました。";
+        state.errorMessage = "Firebase接続に失敗しました。認証や設定を確認してください。";
         state.mode = "loading";
         render();
       }
@@ -1149,7 +1147,7 @@
         location.hash = "";
         state.mode = "home";
         render();
-        await loadAllSites();
+        await refreshHomeSites();
         return;
       }
 
@@ -1271,7 +1269,6 @@
 
     appRoot.addEventListener("input", (event) => {
       const target = event.target;
-
       if (target && target.id === "homeSearchInput") {
         state.homeSearch = target.value;
         render();
@@ -1290,11 +1287,6 @@
         state.current.collaborative = Boolean(String(target.value || "").trim());
         return;
       }
-
-      if (target && target.id === "publicToggle" && state.current) {
-        state.current.isPublic = !!target.checked;
-        return;
-      }
     });
 
     blockDialog.addEventListener("keydown", (e) => {
@@ -1307,7 +1299,11 @@
       e.currentTarget.textContent = `ID: ${creatorId()}`;
     });
 
-    shareDialog.addEventListener("showModal", () => syncShareDialog());
+    async function bootstrap() {
+      state.mode = "loading";
+      render();
+      await initFirebase();
+    }
 
     window.addEventListener("hashchange", async () => {
       const route = parseRoute();
@@ -1328,7 +1324,7 @@
       }
 
       if (route.name === "site") {
-        await openSiteById(route.id, route.key || null);
+        await openSiteById(route.siteId, route.key || null);
       }
     });
 
