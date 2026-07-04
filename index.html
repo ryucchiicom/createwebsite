@@ -23,8 +23,8 @@
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
-    *{ box-sizing:border-box; }
-    html{ scroll-behavior:smooth; }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
     body{
       margin:0;
       min-height:100vh;
@@ -35,17 +35,16 @@
       color:var(--ink);
     }
 
-    button,input,textarea,select{ font:inherit; }
-    button{ cursor:pointer; border:0; }
-    textarea{ resize:vertical; }
+    button,input,textarea,select{font:inherit}
+    button{cursor:pointer;border:0}
+    textarea{resize:vertical}
 
     .app-shell{
       width:min(1120px,100%);
       margin:0 auto;
       padding:20px 16px 112px;
     }
-
-    .hidden{ display:none !important; }
+    .hidden{display:none !important}
 
     .hero{
       display:grid;
@@ -64,22 +63,12 @@
       backdrop-filter:blur(14px);
     }
 
-    .eyebrow{
-      color:var(--brand);
-      font-weight:800;
-      letter-spacing:.08em;
-      font-size:.78rem;
-    }
-
-    h1,h2,h3{ margin:0; line-height:1.15; }
-    h1{
-      font-size:clamp(2rem,7vw,4.5rem);
-      letter-spacing:-.06em;
-      margin-top:8px;
-    }
-    h2{ font-size:clamp(1.35rem,4vw,2.1rem); }
-    h3{ font-size:1.15rem; }
-    p{ color:var(--muted); line-height:1.8; }
+    .eyebrow{color:var(--brand);font-weight:800;letter-spacing:.08em;font-size:.78rem}
+    h1,h2,h3{margin:0;line-height:1.15}
+    h1{font-size:clamp(2rem,7vw,4.5rem);letter-spacing:-.06em;margin-top:8px}
+    h2{font-size:clamp(1.35rem,4vw,2.1rem)}
+    h3{font-size:1.15rem}
+    p{color:var(--muted);line-height:1.8}
 
     .hero-actions,.toolbar,.tabs{
       display:flex;
@@ -102,11 +91,11 @@
       color:#fff;
       box-shadow:0 10px 24px rgba(95,99,242,.28);
     }
-    .btn.primary:hover{ background:var(--brand-dark); }
-    .btn.danger{ color:#fff; background:var(--danger); box-shadow:none; }
-    .btn.ghost{ background:transparent; }
-    .btn.small{ min-height:36px; padding:0 12px; font-size:.9rem; }
-    .btn:disabled{ opacity:.45; cursor:not-allowed; }
+    .btn.primary:hover{background:var(--brand-dark)}
+    .btn.danger{color:#fff;background:var(--danger);box-shadow:none}
+    .btn.ghost{background:transparent}
+    .btn.small{min-height:36px;padding:0 12px;font-size:.9rem}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
 
     .site-grid{
       display:grid;
@@ -139,7 +128,7 @@
       word-break:break-all;
     }
 
-    .editor-layout{ display:grid; gap:16px; align-items:start; }
+    .editor-layout{display:grid;gap:16px;align-items:start}
     .editor-top,.viewer-top{
       display:flex;
       justify-content:space-between;
@@ -148,15 +137,8 @@
       margin-bottom:12px;
     }
 
-    .field{
-      display:grid;
-      gap:7px;
-      margin:12px 0;
-    }
-    .field label{
-      font-weight:800;
-      font-size:.92rem;
-    }
+    .field{display:grid;gap:7px;margin:12px 0}
+    .field label{font-weight:800;font-size:.92rem}
     .field input,.field textarea,.field select{
       width:100%;
       border:1px solid var(--line);
@@ -174,11 +156,7 @@
       border-radius:var(--radius);
     }
 
-    .empty{
-      text-align:center;
-      padding:60px 14px;
-      color:var(--muted);
-    }
+    .empty{text-align:center;padding:60px 14px;color:var(--muted)}
 
     .block{
       background:#fff;
@@ -233,11 +211,7 @@
       box-shadow:var(--shadow);
       z-index:30;
     }
-    .bottom-add-bar span{
-      color:var(--muted);
-      font-weight:700;
-      padding-left:12px;
-    }
+    .bottom-add-bar span{color:var(--muted);font-weight:700;padding-left:12px}
 
     dialog{
       width:min(620px, calc(100% - 24px));
@@ -250,7 +224,7 @@
       background:rgba(15,23,42,.42);
       backdrop-filter:blur(4px);
     }
-    .dialog-body{ padding:22px; }
+    .dialog-body{padding:22px}
     .qr-box{
       width:220px;
       height:220px;
@@ -281,10 +255,7 @@
       background:var(--accent);
       border-color:var(--accent);
     }
-    .tab:disabled{
-      opacity:.45;
-      cursor:not-allowed;
-    }
+    .tab:disabled{opacity:.45;cursor:not-allowed}
     .id-pill{
       display:inline-flex;
       gap:8px;
@@ -314,29 +285,80 @@
       font-weight:800;
       font-size:.88rem;
     }
-    .status-pill.good{
-      color:#0f766e;
-      background:#ecfdf5;
-      border-color:#a7f3d0;
+    .status-pill.good{color:#0f766e;background:#ecfdf5;border-color:#a7f3d0}
+    .status-pill.warn{color:#92400e;background:#fffbeb;border-color:#fcd34d}
+    .status-pill.bad{color:#991b1b;background:#fef2f2;border-color:#fecaca}
+
+    .loading-wrap{
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:24px;
     }
-    .status-pill.warn{
-      color:#92400e;
-      background:#fffbeb;
-      border-color:#fcd34d;
+    .loading-card{
+      width:min(700px,100%);
+      background:var(--card);
+      border:1px solid rgba(255,255,255,.74);
+      border-radius:28px;
+      box-shadow:var(--shadow);
+      padding:28px;
+      backdrop-filter:blur(14px);
     }
-    .status-pill.bad{
-      color:#991b1b;
+    .loader-row{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin:10px 0 16px;
+    }
+    .loader{
+      width:40px;
+      height:40px;
+      border-radius:50%;
+      border:4px solid rgba(95,99,242,.15);
+      border-top-color:var(--brand);
+      animation:spin 1s linear infinite;
+      flex:0 0 auto;
+    }
+    .loader-dots{
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .loader-dots span{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:var(--brand);
+      animation:bounce 1s infinite ease-in-out;
+      display:inline-block;
+    }
+    .loader-dots span:nth-child(2){animation-delay:.15s}
+    .loader-dots span:nth-child(3){animation-delay:.3s}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes bounce{
+      0%,80%,100%{transform:translateY(0);opacity:.55}
+      40%{transform:translateY(-6px);opacity:1}
+    }
+
+    .loading-error{
+      margin-top:14px;
+      padding:14px;
+      border-radius:16px;
       background:#fef2f2;
-      border-color:#fecaca;
+      color:#991b1b;
+      border:1px solid #fecaca;
+      line-height:1.7;
+      white-space:pre-wrap;
+      word-break:break-word;
     }
 
     @media (max-width:820px){
-      .hero,.editor-layout{ grid-template-columns:1fr; }
+      .hero,.editor-layout{grid-template-columns:1fr}
       .editor-top,.viewer-top{
         align-items:stretch;
         flex-direction:column;
       }
-      .toolbar .btn{ flex:1; }
+      .toolbar .btn{flex:1}
       .bottom-add-bar{
         border-radius:24px;
         align-items:stretch;
@@ -350,7 +372,25 @@
   </style>
 </head>
 <body>
-  <main class="app-shell" id="app"></main>
+  <div id="loadingScreen" class="loading-wrap">
+    <div class="loading-card">
+      <div class="eyebrow">CreateWebsite</div>
+      <h1 style="font-size:clamp(1.8rem,6vw,3.2rem);margin-top:10px">読み込み中…</h1>
+      <p id="loadingMessage">Firebase に接続しています。</p>
+      <div class="loader-row">
+        <div class="loader" aria-hidden="true"></div>
+        <div class="loader-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <p class="notice">しばらく待っても進まない場合は、自動で再読み込みします。</p>
+      <div id="loadingErrorBox" class="loading-error hidden"></div>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="loadingReloadBtn" type="button" disabled>再読み込み</button>
+        <button class="btn primary hidden" id="loadingHomeBtn" type="button">トップに戻る</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app-shell hidden" id="app"></main>
 
   <dialog id="blockDialog">
     <div class="dialog-body">
@@ -399,9 +439,8 @@
   </dialog>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+    import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
     import {
       getFirestore,
       collection,
@@ -410,8 +449,9 @@
       setDoc,
       updateDoc,
       doc,
-      arrayUnion
-    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+      arrayUnion,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyCYRh2cUMa4ecUmU9tpOT_ExrZcsYdVyHI",
@@ -425,8 +465,12 @@
 
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
-
     const appRoot = document.getElementById('app');
+    const loadingScreen = document.getElementById('loadingScreen');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const loadingErrorBox = document.getElementById('loadingErrorBox');
+    const loadingReloadBtn = document.getElementById('loadingReloadBtn');
+    const loadingHomeBtn = document.getElementById('loadingHomeBtn');
     const blockDialog = document.getElementById('blockDialog');
     const blockDialogTitle = document.getElementById('blockDialogTitle');
     const blockInput = document.getElementById('blockInput');
@@ -444,13 +488,16 @@
       ready: false,
       mode: 'loading', // loading | home | viewer | editor | missing | denied
       homeSites: [],
-      homeSearch: '',
       homeTab: 'mine',
+      homeSearch: '',
       current: null,
       currentSaved: false,
-      currentAccess: 'view', // view | owner | collaborator | key
+      currentAccess: 'view',
       editingBlockId: null,
-      shareMode: 'view'
+      shareMode: 'view',
+      authError: '',
+      authTimeoutId: null,
+      reloadedOnce: false
     };
 
     function uid8() {
@@ -528,19 +575,12 @@
 
     function parseRoute() {
       const hash = decodeURI(location.hash || '');
-      if (!hash.startsWith('#/')) return { siteId: null, key: null, name: 'home' };
-      const [siteId = null, key = null] = hash.slice(2).split('/');
-      if (siteId === 'create') return { name: 'create' };
-      return { siteId, key, name: 'site' };
-    }
-
-    function slugify(value) {
-      return (value || 'untitled')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-_ぁ-んァ-ヶー一-龠]/g, '')
-        .slice(0, 48) || uid8();
+      if (!hash.startsWith('#/')) return { name: 'home', siteId: null, key: null };
+      const parts = hash.slice(2).split('/');
+      const siteId = parts[0] || null;
+      const key = parts[1] || null;
+      if (siteId === 'create') return { name: 'create', siteId: null, key: null };
+      return { name: 'site', siteId, key };
     }
 
     function normalizeSite(siteId, data = {}) {
@@ -560,13 +600,11 @@
     }
 
     function isMine(site) {
-      if (!site) return false;
-      return Boolean(site.ownerUid && site.ownerUid === state.uid);
+      return Boolean(site && site.ownerUid && site.ownerUid === state.uid);
     }
 
     function isCollaborator(site) {
-      if (!site) return false;
-      return Array.isArray(site.collaborators) && site.collaborators.includes(state.uid);
+      return Boolean(site && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid));
     }
 
     function canEditCurrent() {
@@ -582,12 +620,12 @@
       return siteUrl(state.current.siteId, key);
     }
 
-    function statusPill(text, kind = '') {
-      const cls =
-        kind === 'good' ? 'status-pill good' :
-        kind === 'warn' ? 'status-pill warn' :
-        kind === 'bad' ? 'status-pill bad' : 'status-pill';
-      return `<span class="${cls}">${esc(text)}</span>`;
+    function homeStatusHtml() {
+      if (!state.ready) {
+        const cls = state.authError ? 'status-pill bad' : 'status-pill warn';
+        return `<span class="${cls}">${esc(state.authError || 'Firebase接続中…')}</span>`;
+      }
+      return `<span class="status-pill good">Firebaseに接続しました。</span>`;
     }
 
     function siteSearchText(site) {
@@ -619,37 +657,13 @@
         .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     }
 
-    function renderLoading() {
-      appRoot.innerHTML = `
-        <div class="hero">
-          <div class="panel">
-            <div class="eyebrow">CreateWebsite</div>
-            <h1>読み込み中…</h1>
-            <p>Firebase からデータを取っています。</p>
-            <div class="hero-actions">
-              <button class="btn primary" disabled>＋ 新規作成</button>
-              <button class="btn" disabled>自分のIDを見る</button>
-            </div>
-          </div>
-          <div class="panel">
-            <h2>準備中</h2>
-            <p>${esc(state.errorText || '接続を待っています。')}</p>
-            <div class="site-grid">
-              <div class="empty">しばらくしても動かない場合は Firebase 設定を確認してね。</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
     function renderHome() {
       const mine = filterSites(mineSites(), state.homeSearch);
       const pub = filterSites(publicSites(), state.homeSearch);
-
+      const list = state.homeTab === 'mine' ? mine : pub;
       const tabMine = state.homeTab === 'mine' ? 'active' : '';
       const tabPub = state.homeTab === 'public' ? 'active' : '';
 
-      const list = state.homeTab === 'mine' ? mine : pub;
       const listHtml = list.length
         ? list.map((site) => {
             const badge = isMine(site) ? '自分' : isCollaborator(site) ? '共同編集' : '公開';
@@ -680,10 +694,10 @@
             <div class="toolbar" style="margin:8px 0 12px">
               <button class="tab ${tabMine}" data-home-tab="mine" type="button">自分のサイト</button>
               <button class="tab ${tabPub}" data-home-tab="public" type="button">公開サイト</button>
-              <input id="homeSearchInput" style="flex:1;min-width:220px" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
+              <input id="homeSearchInput" class="field" style="flex:1;min-width:220px;padding:0;margin:0" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
               <button class="btn" id="homeRefreshBtn" type="button">↻</button>
             </div>
-            ${statusPill(state.ready ? 'Firebaseに接続しました。' : '接続中…', state.ready ? 'good' : 'warn')}
+            ${homeStatusHtml()}
             <div class="site-grid" id="siteList">${listHtml}</div>
           </div>
         </div>
@@ -692,22 +706,23 @@
 
     function renderViewer() {
       const site = state.current;
-      const blocks = (site?.blocks || []).map((block) => `
-        <article class="block">
-          <div class="rendered-text">${renderFormattedBlock(block.html || '')}</div>
-        </article>
-      `).join('');
+      const blocks = (site?.blocks || [])
+        .map((block) => `
+          <article class="block">
+            <div class="rendered-text">${renderFormattedBlock(block.html || '')}</div>
+          </article>
+        `).join('');
 
-      const status =
-        canEditCurrent() ? statusPill(state.currentAccess === 'key' ? '共同編集モード' : '編集可能', 'good') :
-        statusPill('閲覧モード', 'warn');
+      const statusHtml = canEditCurrent()
+        ? `<span class="status-pill good">${state.currentAccess === 'key' ? '共同編集モード' : '編集可能'}</span>`
+        : `<span class="status-pill warn">閲覧モード</span>`;
 
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
             <button class="btn ghost" id="viewerHomeBtn">← 一覧へ</button>
             <div class="toolbar" style="justify-content:flex-end">
-              ${status}
+              ${statusHtml}
               <button class="btn" id="viewerShareBtn">共有</button>
               <button class="btn primary" id="viewerEditBtn" ${canEditCurrent() ? '' : 'hidden'}>編集する</button>
             </div>
@@ -777,6 +792,16 @@
       `;
     }
 
+    function renderLoading() {
+      appRoot.classList.add('hidden');
+      loadingScreen.classList.remove('hidden');
+      loadingReloadBtn.disabled = !state.ready;
+      loadingHomeBtn.classList.toggle('hidden', !state.authError);
+      loadingErrorBox.classList.toggle('hidden', !state.authError);
+      loadingErrorBox.textContent = state.authError || '';
+      loadingMessage.textContent = state.authError ? 'Firebase 接続に失敗しました。' : 'Firebase に接続しています。';
+    }
+
     function renderMissingScreen(message = 'このリンクのサイトは見つかりませんでした。') {
       appRoot.innerHTML = `
         <div class="panel">
@@ -820,6 +845,11 @@
       state.editingBlockId = null;
     }
 
+    function openHome() {
+      state.mode = 'home';
+      render();
+    }
+
     function openViewer(site, access = 'view') {
       setCurrentSite(site, true);
       state.currentAccess = access;
@@ -834,213 +864,11 @@
       render();
     }
 
-    function openMissingScreen(message) {
-      state.current = null;
-      state.currentSaved = false;
-      state.currentAccess = 'view';
-      state.mode = 'missing';
-      renderMissingScreen(message);
-    }
-
-    function openDeniedScreen() {
-      state.current = null;
-      state.currentSaved = false;
-      state.currentAccess = 'view';
-      state.mode = 'denied';
-      renderDeniedScreen();
-    }
-
-    function updateRouteForSite(siteId, key = null) {
-      history.replaceState(null, '', siteUrl(siteId, key));
-      state.routeSiteId = siteId;
-      state.routeKey = key;
-    }
-
-    function createDraftSite() {
-      const id = uid8();
-      return normalizeSite(id, {
-        siteId: id,
-        title: '無題のサイト',
-        ownerUid: state.uid,
-        creatorId: creatorId(),
-        key: '',
-        blocks: [
-          { id: uid8(), html: 'こんにちは<br><strong>太字</strong><br>\'#ff0000赤文字\'' }
-        ],
-        isPublic: true,
-        collaborative: false,
-        collaborators: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
-    }
-
-    async function loadAllSites() {
-      if (!state.db) return [];
-      const snapshot = await getDocs(collection(state.db, COLLECTION));
-      state.homeSites = snapshot.docs.map((d) => normalizeSite(d.id, d.data() || {}));
-      return state.homeSites;
-    }
-
-    async function loadSiteById(siteId) {
-      if (!state.db || !siteId) return null;
-
-      const snap = await getDoc(doc(state.db, COLLECTION, siteId));
-      if (snap.exists()) return normalizeSite(snap.id, snap.data() || {});
-
-      const all = await getDocs(collection(state.db, COLLECTION));
-      return all.docs
-        .map((d) => normalizeSite(d.id, d.data() || {}))
-        .find((site) => site.siteId === siteId || slugify(site.title) === siteId) || null;
-    }
-
-    function refreshHomeSites() {
-      return loadAllSites().then(() => {
-        if (state.mode === 'home') render();
-      });
-    }
-
-    function openHome() {
-      state.mode = 'home';
-      render();
-    }
-
-    function refreshShareDialog() {
-      const url = currentShareUrl();
-      shareUrlEl.textContent = url || '保存後に共有リンクが出るよ';
-
-      if (!state.current) {
-        shareNoticeEl.textContent = '先にサイトを開いてください。';
-      } else if (!state.currentSaved) {
-        shareNoticeEl.textContent = '先に保存してね。';
-      } else if (state.shareMode === 'edit' && !state.current.key) {
-        shareNoticeEl.textContent = '共同編集Keyが未設定です。';
-      } else if (state.shareMode === 'edit') {
-        shareNoticeEl.textContent = 'このリンクを開くと共同編集者として追加されます。';
-      } else {
-        shareNoticeEl.textContent = 'このリンクは閲覧用です。';
-      }
-
-      qrBox.innerHTML = '生成中…';
-      setTimeout(() => {
-        qrBox.innerHTML = '';
-        if (window.QRCode && url) {
-          new QRCode(qrBox, { text: url, width: 200, height: 200 });
-        } else {
-          qrBox.textContent = 'QRライブラリを読み込めませんでした';
-        }
-      }, 120);
-    }
-
-    function openShareDialog() {
-      if (!state.current) {
-        alert('先にサイトを開いてください。');
-        return;
-      }
-      if (!state.currentSaved) {
-        alert('先に保存してね。');
-        return;
-      }
-
-      state.shareMode = 'view';
-      shareTabs.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.shareTab === 'view'));
-      shareTabs.querySelector('[data-share-tab="edit"]').disabled = !state.current.key;
-      refreshShareDialog();
-      shareDialog.showModal();
-    }
-
-    async function ensureCollaboratorForKey(site, key) {
-      if (!site || !key || site.key !== key || !state.uid) return site;
-
-      const collaborators = Array.from(new Set([...(site.collaborators || []), state.uid]));
-      await updateDoc(doc(state.db, COLLECTION, site.siteId), {
-        collaborators: arrayUnion(state.uid),
-        collaborative: true
-      });
-
-      return normalizeSite(site.siteId, { ...site, collaborators, collaborative: true });
-    }
-
-    async function openSiteById(siteId, key = null) {
+    function openNewDraft() {
       if (!state.ready) return;
-
-      const site = await loadSiteById(siteId);
-      if (!site) {
-        openMissingScreen('このリンクのサイトは見つかりませんでした。');
-        return;
-      }
-
-      let resolved = site;
-      const keyOk = Boolean(key && site.key && key === site.key);
-
-      if (keyOk) {
-        resolved = await ensureCollaboratorForKey(site, key);
-        state.currentAccess = 'key';
-        state.current = resolved;
-        state.currentSaved = true;
-        state.mode = 'viewer';
-        updateRouteForSite(resolved.siteId, key);
-        render();
-        return;
-      }
-
-      if (isMine(site)) {
-        state.currentAccess = 'owner';
-        openViewer(site, 'owner');
-        updateRouteForSite(site.siteId);
-        return;
-      }
-
-      if (isCollaborator(site)) {
-        state.currentAccess = 'collaborator';
-        openViewer(site, 'collaborator');
-        updateRouteForSite(site.siteId);
-        return;
-      }
-
-      if (site.isPublic !== false) {
-        state.currentAccess = 'view';
-        openViewer(site, 'view');
-        updateRouteForSite(site.siteId);
-        return;
-      }
-
-      openDeniedScreen();
-    }
-
-    async function saveCurrentSite() {
-      if (!state.current || !state.db) {
-        alert('先にサイトを作ってね');
-        return;
-      }
-
-      const title = String(document.getElementById('titleInput')?.value || '').trim() || '無題のサイト';
-      const key = String(document.getElementById('editKeyInput')?.value || '').trim();
-
-      state.current.title = title;
-      state.current.key = key;
-      state.current.collaborative = Boolean(key);
-      state.current.updatedAt = Date.now();
-      state.current.ownerUid = state.current.ownerUid || state.uid;
-      state.current.creatorId = state.current.creatorId || creatorId();
-
-      const payload = {
-        ...state.current,
-        blocks: state.current.blocks.map((b) => ({ id: b.id || uid8(), html: String(b.html || '') })),
-        collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
-        updatedAt: Date.now()
-      };
-
-      await setDoc(doc(state.db, COLLECTION, state.current.siteId), payload, { merge: true });
-
-      state.currentSaved = true;
-      state.current = normalizeSite(state.current.siteId, payload);
-      await refreshHomeSites();
-
-      const keepKey = state.routeKey && state.current.key && state.routeKey === state.current.key;
-      updateRouteForSite(state.current.siteId, keepKey ? state.current.key : null);
-      openEditor(state.current, true, canEditCurrent() ? state.currentAccess : 'owner');
-      alert('保存しました。');
+      const draft = createDraftSite();
+      openEditor(draft, false, 'owner');
+      location.hash = '#/create';
     }
 
     function openBlockDialog(blockId = null) {
@@ -1071,32 +899,325 @@
       render();
     }
 
-    function openNewSite() {
-      if (!state.ready) {
-        alert('Firebase接続がまだ完了していません。');
+    function createDraftSite() {
+      const id = uid8();
+      return normalizeSite(id, {
+        siteId: id,
+        title: '無題のサイト',
+        ownerUid: state.uid,
+        creatorId: creatorId(),
+        key: '',
+        blocks: [
+          { id: uid8(), html: 'こんにちは<br><strong>太字</strong><br>\'#ff0000赤文字\'' }
+        ],
+        isPublic: true,
+        collaborative: false,
+        collaborators: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+
+    async function loadAllSites() {
+      if (!state.db) return [];
+      const snapshot = await getDocs(collection(state.db, COLLECTION));
+      state.homeSites = snapshot.docs.map((d) => normalizeSite(d.id, d.data() || {}));
+      return state.homeSites;
+    }
+
+    async function loadSiteById(siteId) {
+      if (!state.db || !siteId) return null;
+      const snap = await getDoc(doc(state.db, COLLECTION, siteId));
+      if (!snap.exists()) return null;
+      return normalizeSite(snap.id, snap.data() || {});
+    }
+
+    async function refreshHomeSites() {
+      await loadAllSites();
+      if (state.mode === 'home') render();
+    }
+
+    function openShareDialog() {
+      if (!state.current) {
+        alert('先にサイトを開いてください。');
+        return;
+      }
+      if (!state.currentSaved) {
+        alert('先に保存してね。');
         return;
       }
 
-      const draft = createDraftSite();
-      state.current = draft;
-      state.currentSaved = true;
-      state.currentAccess = 'owner';
-
-      setDoc(doc(state.db, COLLECTION, draft.siteId), draft, { merge: true })
-        .then(async () => {
-          await refreshHomeSites();
-          updateRouteForSite(draft.siteId);
-          openEditor(draft, true, 'owner');
-        })
-        .catch((error) => {
-          console.error(error);
-          alert('新規作成に失敗しました。');
-        });
+      state.shareMode = 'view';
+      shareTabs.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.shareTab === 'view'));
+      const editBtn = shareTabs.querySelector('[data-share-tab="edit"]');
+      if (editBtn) editBtn.disabled = !state.current.key;
+      syncShareDialog();
+      shareDialog.showModal();
     }
 
-    function openIdDialog() {
-      ownerIdBtn.textContent = 'ID: ••••';
-      idDialog.showModal();
+    function syncShareDialog() {
+      const url = currentShareUrl();
+      shareUrlEl.textContent = url || '保存後に共有リンクが出るよ';
+
+      if (!state.current) {
+        shareNoticeEl.textContent = '先にサイトを開いてください。';
+      } else if (!state.currentSaved) {
+        shareNoticeEl.textContent = '先に保存してね。';
+      } else if (state.shareMode === 'edit' && !state.current.key) {
+        shareNoticeEl.textContent = '共同編集Keyが未設定です。';
+      } else if (state.shareMode === 'edit') {
+        shareNoticeEl.textContent = 'このリンクを開くと共同編集者として追加されます。';
+      } else {
+        shareNoticeEl.textContent = 'このリンクは閲覧用です。';
+      }
+
+      qrBox.innerHTML = '生成中…';
+      setTimeout(() => {
+        qrBox.innerHTML = '';
+        if (window.QRCode && url) {
+          new QRCode(qrBox, { text: url, width: 200, height: 200 });
+        } else {
+          qrBox.textContent = 'QRライブラリを読み込めませんでした';
+        }
+      }, 120);
+    }
+
+    async function saveCurrentSite() {
+      if (!state.current || !state.db) {
+        alert('先にサイトを作ってね');
+        return;
+      }
+
+      const titleInput = document.getElementById('titleInput');
+      const keyInput = document.getElementById('editKeyInput');
+      const title = String(titleInput?.value || '').trim() || '無題のサイト';
+      const key = String(keyInput?.value || '').trim();
+
+      state.current.title = title;
+      state.current.key = key;
+      state.current.collaborative = Boolean(key);
+      state.current.updatedAt = Date.now();
+      state.current.ownerUid = state.current.ownerUid || state.uid;
+      state.current.creatorId = state.current.creatorId || creatorId();
+
+      const payload = {
+        ...state.current,
+        blocks: (state.current.blocks || []).map((b) => ({ id: b.id || uid8(), html: String(b.html || '') })),
+        collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
+        updatedAt: Date.now()
+      };
+
+      await setDoc(doc(state.db, COLLECTION, state.current.siteId), payload, { merge: true });
+
+      state.currentSaved = true;
+      state.current = normalizeSite(state.current.siteId, payload);
+      await loadAllSites();
+      location.hash = `#/${state.current.siteId}`;
+      openViewer(state.current);
+      alert('保存しました。');
+    }
+
+    async function openSiteById(siteId, key = null) {
+      if (!state.ready) return;
+
+      const site = await loadSiteById(siteId);
+      if (!site) {
+        state.mode = 'missing';
+        state.current = null;
+        render();
+        return;
+      }
+
+      if (key && site.key && key === site.key) {
+        try {
+          await updateDoc(doc(state.db, COLLECTION, site.siteId), {
+            collaborators: arrayUnion(state.uid),
+            collaborative: true
+          });
+          site.collaborators = Array.from(new Set([...(site.collaborators || []), state.uid]));
+          site.collaborative = true;
+          state.currentAccess = 'key';
+        } catch (error) {
+          console.error(error);
+          state.currentAccess = 'key';
+          alert('共同編集者の登録に失敗しました。Firestoreルールを確認してね。');
+        }
+      } else if (isMine(site)) {
+        state.currentAccess = 'owner';
+      } else if (isCollaborator(site)) {
+        state.currentAccess = 'collaborator';
+      } else {
+        state.currentAccess = 'view';
+      }
+
+      state.current = site;
+      state.currentSaved = true;
+
+      if (site.isPublic === false && !canEditCurrent()) {
+        state.mode = 'denied';
+        render();
+        return;
+      }
+
+      state.mode = 'viewer';
+      render();
+    }
+
+    function showMissingSite(message = 'このリンクのサイトは見つかりませんでした。') {
+      state.current = {
+        siteId: 'missing',
+        title: 'サイトが見つかりません',
+        blocks: [{ id: 'missing', html: message }]
+      };
+      state.currentSaved = true;
+      state.mode = 'missing';
+      render();
+    }
+
+    function setLoading(message) {
+      state.mode = 'loading';
+      state.authError = message || '';
+      render();
+    }
+
+    function scheduleAuthReload() {
+      clearTimeout(state.authTimeoutId);
+      state.authTimeoutId = setTimeout(() => {
+        if (state.ready) return;
+
+        if (!state.reloadedOnce) {
+          state.reloadedOnce = true;
+          sessionStorage.setItem('cw_reload_attempt', '1');
+          location.reload();
+          return;
+        }
+
+        state.authError = '5秒経っても読み込みできませんでした。';
+        render();
+        loadingReloadBtn.disabled = false;
+        loadingHomeBtn.classList.remove('hidden');
+        loadingErrorBox.classList.remove('hidden');
+        loadingErrorBox.textContent = '読み込みに失敗しました。再読み込みか、トップに戻ってからもう一度試してください。';
+      }, 5000);
+    }
+
+    async function initFirebase() {
+      const reloadFlag = sessionStorage.getItem('cw_reload_attempt');
+      state.reloadedOnce = reloadFlag === '1';
+
+      if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+        setLoading('Firebase設定がありません。firebaseConfig を入れてください。');
+        loadingReloadBtn.disabled = false;
+        loadingHomeBtn.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+
+        scheduleAuthReload();
+
+        const cred = await signInAnonymously(auth);
+        clearTimeout(state.authTimeoutId);
+
+        state.uid = cred.user?.uid || auth.currentUser?.uid || '';
+        state.ready = true;
+        state.authError = '';
+        sessionStorage.removeItem('cw_reload_attempt');
+
+        loadingScreen.classList.add('hidden');
+        appRoot.classList.remove('hidden');
+
+        await loadAllSites();
+
+        const route = parseRoute();
+        if (route.name === 'site') {
+          await openSiteById(route.siteId, route.key || null);
+        } else if (route.name === 'create') {
+          openNewDraft();
+        } else {
+          state.mode = 'home';
+          render();
+        }
+      } catch (error) {
+        clearTimeout(state.authTimeoutId);
+        console.error(error);
+
+        const code = error?.code || '';
+        if (code === 'auth/configuration-not-found') {
+          setLoading('Firebase Authentication の匿名ログインが未設定か、Auth 側の設定が足りません。');
+        } else if (code === 'auth/operation-not-allowed') {
+          setLoading('Firebase Authentication の匿名ログインが無効です。Auth で Anonymous を有効にしてください。');
+        } else if (code === 'auth/network-request-failed') {
+          setLoading('ネットワークに接続できません。通信許可とブラウザ設定を確認してください。');
+        } else {
+          setLoading(`Firebase接続に失敗しました。${code ? `(${code})` : ''}`);
+        }
+
+        loadingReloadBtn.disabled = false;
+        loadingHomeBtn.classList.remove('hidden');
+        loadingErrorBox.classList.remove('hidden');
+        loadingErrorBox.textContent = state.authError;
+        render();
+      }
+    }
+
+    function wireStaticDialogButtons() {
+      document.getElementById('blockSaveBtn').addEventListener('click', saveBlockDialog);
+      document.getElementById('blockCancelBtn').addEventListener('click', closeBlockDialog);
+
+      document.getElementById('closeIdBtn').addEventListener('click', () => idDialog.close());
+      document.getElementById('copyIdBtn').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(creatorId());
+          alert('IDをコピーしました');
+        } catch {
+          prompt('コピーできない場合はこれを使ってね', creatorId());
+        }
+      });
+      document.getElementById('mergeIdBtn').addEventListener('click', () => {
+        alert('この版ではID統合はデモだけです。');
+      });
+      document.getElementById('ownerIdBtn').addEventListener('click', (e) => {
+        e.currentTarget.textContent = `ID: ${creatorId()}`;
+      });
+
+      document.getElementById('closeShareBtn').addEventListener('click', () => shareDialog.close());
+      document.getElementById('copyShareBtn').addEventListener('click', async () => {
+        const url = currentShareUrl();
+        if (!url) {
+          alert('先に保存してね。');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(url);
+          alert('コピーしました');
+        } catch {
+          prompt('コピーできないときはこれを使ってね', url);
+        }
+      });
+      document.getElementById('webShareBtn').addEventListener('click', async () => {
+        const url = currentShareUrl();
+        if (!url) {
+          alert('先に保存してね。');
+          return;
+        }
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: state.current?.title || 'CreateWebsite', url });
+          } catch {}
+        } else {
+          alert('このブラウザはWeb Share APIに対応していません。');
+        }
+      });
+
+      loadingReloadBtn.addEventListener('click', () => location.reload());
+      loadingHomeBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('cw_reload_attempt');
+        location.href = basePageUrl();
+      });
     }
 
     appRoot.addEventListener('click', async (event) => {
@@ -1141,12 +1262,13 @@
       }
 
       if (target.closest('#newSiteBtn')) {
-        openNewSite();
+        openNewDraft();
         return;
       }
 
       if (target.closest('#showIdBtn')) {
-        openIdDialog();
+        ownerIdBtn.textContent = 'ID: ••••';
+        idDialog.showModal();
         return;
       }
 
@@ -1157,10 +1279,10 @@
         state.current = null;
         state.currentSaved = false;
         state.currentAccess = 'view';
-        state.mode = 'home';
         location.hash = '';
+        state.mode = 'home';
+        render();
         await refreshHomeSites();
-        openHome();
         return;
       }
 
@@ -1198,69 +1320,8 @@
         return;
       }
 
-      if (target.closest('#blockCancelBtn')) {
-        closeBlockDialog();
-        return;
-      }
-
-      if (target.closest('#blockSaveBtn')) {
-        saveBlockDialog();
-        return;
-      }
-
-      if (target.closest('#copyIdBtn')) {
-        try {
-          await navigator.clipboard.writeText(creatorId());
-          alert('IDをコピーしました');
-        } catch {
-          prompt('コピーできない場合はこれを使ってね', creatorId());
-        }
-        return;
-      }
-
-      if (target.closest('#closeIdBtn')) {
-        idDialog.close();
-        return;
-      }
-
-      if (target.closest('#mergeIdBtn')) {
-        alert('この版ではID統合はデモだけです。');
-        return;
-      }
-
-      if (target.closest('#closeShareBtn')) {
-        shareDialog.close();
-        return;
-      }
-
-      if (target.closest('#copyShareBtn')) {
-        const url = currentShareUrl();
-        if (!url) {
-          alert('先に保存してね。');
-          return;
-        }
-        try {
-          await navigator.clipboard.writeText(url);
-          alert('コピーしました');
-        } catch {
-          prompt('コピーできないときはこれを使ってね', url);
-        }
-        return;
-      }
-
-      if (target.closest('#webShareBtn')) {
-        const url = currentShareUrl();
-        if (!url) {
-          alert('先に保存してね。');
-          return;
-        }
-        if (navigator.share) {
-          try {
-            await navigator.share({ title: state.current?.title || 'CreateWebsite', url });
-          } catch {}
-        } else {
-          alert('このブラウザはWeb Share APIに対応していません。');
-        }
+      if (target.closest('#homeRefreshBtn')) {
+        await refreshHomeSites();
         return;
       }
 
@@ -1273,9 +1334,10 @@
 
       const shareTab = target.closest('[data-share-tab]');
       if (shareTab) {
+        if (shareTab.disabled) return;
         state.shareMode = shareTab.getAttribute('data-share-tab') || 'view';
         shareTabs.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab === shareTab));
-        refreshShareDialog();
+        syncShareDialog();
         return;
       }
     });
@@ -1302,10 +1364,16 @@
       }
     });
 
-    document.getElementById('blockCancelBtn').addEventListener('click', closeBlockDialog);
-    document.getElementById('blockSaveBtn').addEventListener('click', saveBlockDialog);
-    document.getElementById('ownerIdBtn').addEventListener('click', (e) => {
-      e.currentTarget.textContent = `ID: ${creatorId()}`;
+    blockDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeBlockDialog();
+    });
+
+    document.getElementById('shareTabs').addEventListener('click', (event) => {
+      const tab = event.target.closest('.tab');
+      if (!tab || tab.disabled) return;
+      state.shareMode = tab.dataset.shareTab || 'view';
+      shareTabs.querySelectorAll('.tab').forEach((el) => el.classList.toggle('active', el === tab));
+      syncShareDialog();
     });
 
     window.addEventListener('hashchange', async () => {
@@ -1322,7 +1390,7 @@
       }
 
       if (route.name === 'create') {
-        openNewSite();
+        openNewDraft();
         return;
       }
 
@@ -1332,39 +1400,10 @@
     });
 
     async function bootstrap() {
+      wireStaticDialogButtons();
       state.mode = 'loading';
-      render();
-
-      try {
-        const app = initializeApp(firebaseConfig);
-        try {
-          getAnalytics(app);
-        } catch {}
-
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
-        const cred = await signInAnonymously(auth);
-
-        state.uid = cred.user?.uid || '';
-        state.ready = true;
-        await loadAllSites();
-
-        const route = parseRoute();
-        if (route.name === 'site') {
-          await openSiteById(route.siteId, route.key || null);
-        } else if (route.name === 'create') {
-          openNewSite();
-        } else {
-          state.mode = 'home';
-          render();
-        }
-      } catch (error) {
-        console.error(error);
-        state.ready = false;
-        state.mode = 'loading';
-        state.errorText = 'Firebase接続に失敗しました。認証や設定を確認してください。';
-        render();
-      }
+      renderLoading();
+      await initFirebase();
     }
 
     bootstrap();
