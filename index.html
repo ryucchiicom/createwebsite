@@ -80,6 +80,8 @@
       background:#fff;
       color:var(--ink);
       box-shadow:inset 0 0 0 1px var(--line);
+      position:relative;
+      z-index:1;
     }
     .btn.primary{
       background:var(--brand);
@@ -91,6 +93,17 @@
     .btn.ghost{background:transparent}
     .btn.small{min-height:36px;padding:0 12px;font-size:.9rem}
     .btn:disabled{opacity:.45;cursor:not-allowed}
+
+    .search-input{
+      flex:1;
+      min-width:220px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:#fff;
+      color:var(--ink);
+      box-shadow:none;
+    }
 
     .site-grid{
       display:grid;
@@ -149,6 +162,10 @@
       padding:14px;
       margin-bottom:12px;
     }
+    .block-hidden{
+      opacity:.62;
+      background:#f8fafc;
+    }
 
     .block-head{
       display:flex;
@@ -158,11 +175,46 @@
       margin-bottom:8px;
     }
 
+    .block-meta{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-weight:800;
+      font-size:.85rem;
+    }
+
+    .block-badge{
+      display:inline-flex;
+      align-items:center;
+      padding:5px 9px;
+      border-radius:999px;
+      background:#eef2ff;
+      color:#3730a3;
+      border:1px solid #c7d2fe;
+    }
+
+    .block-badge.warn{
+      background:#fef2f2;
+      color:#991b1b;
+      border-color:#fecaca;
+    }
+
+    .block-actions{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+
     .rendered-text{
       white-space:pre-wrap;
       line-height:1.8;
       word-break:break-word;
+      overflow-x:auto;
     }
+    .nowrap .rendered-text{ white-space:nowrap; }
+    .viewer-block-hidden{ display:none; }
 
     .rich-editor{
       min-height:180px;
@@ -320,6 +372,71 @@
       100%{transform:rotate(360deg) translate(10px) scale(1)}
     }
 
+    .settings-grid{
+      display:grid;
+      gap:14px;
+      margin-top:10px;
+    }
+    .setting-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+    }
+    .setting-row .label{
+      display:grid;
+      gap:4px;
+    }
+    .setting-row .label strong{
+      font-size:1rem;
+    }
+    .setting-row .label span{
+      color:var(--muted);
+      font-size:.9rem;
+      line-height:1.5;
+    }
+    .switch{
+      width:48px;
+      height:28px;
+      appearance:none;
+      -webkit-appearance:none;
+      background:#cbd5e1;
+      border-radius:999px;
+      position:relative;
+      outline:none;
+      cursor:pointer;
+      transition:background .18s;
+      flex:0 0 auto;
+    }
+    .switch::before{
+      content:"";
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#fff;
+      position:absolute;
+      top:3px;
+      left:3px;
+      transition:transform .18s;
+      box-shadow:0 4px 10px rgba(0,0,0,.18);
+    }
+    .switch:checked{
+      background:var(--brand);
+    }
+    .switch:checked::before{
+      transform:translateX(20px);
+    }
+
+    .modal-note{
+      margin-top:12px;
+      font-size:.92rem;
+      color:var(--muted);
+    }
+
     @media (max-width:820px){
       .hero,.editor-layout{grid-template-columns:1fr}
       .editor-top,.viewer-top{
@@ -335,6 +452,10 @@
       .bottom-add-bar span{
         padding-left:0;
         text-align:center;
+      }
+      .setting-row{
+        flex-direction:column;
+        align-items:stretch;
       }
     }
   </style>
@@ -357,16 +478,72 @@
     </div>
   </dialog>
 
+  <dialog id="blockSettingsDialog">
+    <div class="dialog-body">
+      <h2>ブロック設定</h2>
+      <p>このブロックの見え方を変えられます。</p>
+      <div class="settings-grid">
+        <div class="setting-row">
+          <div class="label">
+            <strong>表示する</strong>
+            <span>オフにすると閲覧画面では表示されません。</span>
+          </div>
+          <input id="blockVisibleToggle" class="switch" type="checkbox" />
+        </div>
+        <div class="setting-row">
+          <div class="label">
+            <strong>文字を折り返す</strong>
+            <span>オフにすると横に長いまま表示されます。</span>
+          </div>
+          <input id="blockWrapToggle" class="switch" type="checkbox" />
+        </div>
+      </div>
+      <p class="modal-note">今後ここにも設定を追加していけます。</p>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="blockSettingsCloseBtn" type="button">閉じる</button>
+        <button class="btn primary" id="blockSettingsSaveBtn" type="button">保存</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="dialog-body">
+      <h2>設定</h2>
+      <p>公開範囲など、今後ここに設定を足していきます。</p>
+      <div class="settings-grid">
+        <div class="setting-row">
+          <div class="label">
+            <strong>公開する</strong>
+            <span>オフにすると、公開リンクからは閲覧できなくなります。</span>
+          </div>
+          <input id="publicToggle" class="switch" type="checkbox" />
+        </div>
+      </div>
+      <p class="modal-note">設定を保存すると、そのままFirestoreへ反映されます。</p>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="settingsCloseBtn" type="button">閉じる</button>
+        <button class="btn primary" id="settingsSaveBtn" type="button">保存</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="idDialog">
     <div class="dialog-body">
       <h2>自分のID</h2>
       <p>IDは作成したサイトの持ち主判定に使います。普段は伏せて表示します。</p>
       <button class="id-pill" id="ownerIdBtn" type="button">ID: ••••</button>
+
+      <div class="field" style="margin-top:14px">
+        <label for="mergeTargetInput">ID統合先</label>
+        <input id="mergeTargetInput" placeholder="統合先IDを入力" />
+      </div>
+
       <div class="toolbar" style="margin-top:14px">
         <button class="btn" id="copyIdBtn" type="button">IDコピー</button>
         <button class="btn danger" id="mergeIdBtn" type="button">ID統合</button>
         <button class="btn" id="closeIdBtn" type="button">閉じる</button>
       </div>
+      <p class="modal-note">ID統合は、creatorId が今のIDのサイトを新しいIDへまとめます。</p>
     </div>
   </dialog>
 
@@ -417,11 +594,22 @@
     const RELOAD_KEY = 'createwebsite:bootReloadedOnce';
 
     const appRoot = document.getElementById('app');
+
     const blockDialog = document.getElementById('blockDialog');
     const blockDialogTitle = document.getElementById('blockDialogTitle');
     const blockInput = document.getElementById('blockInput');
+
+    const blockSettingsDialog = document.getElementById('blockSettingsDialog');
+    const blockVisibleToggle = document.getElementById('blockVisibleToggle');
+    const blockWrapToggle = document.getElementById('blockWrapToggle');
+
+    const settingsDialog = document.getElementById('settingsDialog');
+    const publicToggle = document.getElementById('publicToggle');
+
     const idDialog = document.getElementById('idDialog');
     const ownerIdBtn = document.getElementById('ownerIdBtn');
+    const mergeTargetInput = document.getElementById('mergeTargetInput');
+
     const shareDialog = document.getElementById('shareDialog');
     const shareTabs = document.getElementById('shareTabs');
     const shareUrlEl = document.getElementById('shareUrl');
@@ -443,6 +631,7 @@
       shareMode: 'view',
       authError: '',
       loadingMessage: 'Firebase接続中…',
+      activeBlockSettingsId: null
     };
 
     let bootTimer = null;
@@ -530,6 +719,15 @@
       return { name: 'site', siteId, key };
     }
 
+    function normalizeBlock(block = {}) {
+      return {
+        id: block.id || uid8(),
+        html: String(block.html ?? ''),
+        visible: block.visible !== false,
+        wrap: block.wrap !== false
+      };
+    }
+
     function normalizeSite(siteId, data = {}) {
       return {
         siteId: siteId || data.siteId || uid8(),
@@ -538,7 +736,7 @@
         ownerUid: data.ownerUid || '',
         creatorId: data.creatorId || creatorId(),
         collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
-        blocks: Array.isArray(data.blocks) ? data.blocks : [],
+        blocks: Array.isArray(data.blocks) ? data.blocks.map(normalizeBlock) : [],
         isPublic: data.isPublic !== false,
         collaborative: Boolean(data.collaborative || data.key),
         createdAt: data.createdAt || Date.now(),
@@ -572,7 +770,7 @@
         const cls = state.authError ? 'status-pill bad' : 'status-pill warn';
         return `<span class="${cls}">${esc(state.authError || state.loadingMessage)}</span>`;
       }
-      return `<span class="status-pill good">Firebaseに接続しました。</span>`;
+      return '';
     }
 
     function siteSearchText(site) {
@@ -653,10 +851,11 @@
       const listHtml = list.length
         ? list.map((site) => {
             const badge = isMine(site) ? '自分' : isCollaborator(site) ? '共同編集' : '公開';
+            const visibility = site.isPublic === false ? '非公開' : '公開';
             return `
               <button class="site-card" data-open-site="${esc(site.siteId)}" type="button">
                 <strong>${esc(site.title)}</strong>
-                <span>${esc(siteUrl(site.siteId))}<br>${esc(badge)}</span>
+                <span>${esc(siteUrl(site.siteId))}<br>${esc(badge)} / ${esc(visibility)}</span>
               </button>
             `;
           }).join('')
@@ -680,7 +879,7 @@
             <div class="toolbar" style="margin:8px 0 12px">
               <button class="tab ${tabMine}" data-home-tab="mine" type="button">自分のサイト</button>
               <button class="tab ${tabPub}" data-home-tab="public" type="button">公開サイト</button>
-              <input id="homeSearchInput" style="flex:1;min-width:220px" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
+              <input id="homeSearchInput" class="search-input" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
               <button class="btn" id="homeRefreshBtn" type="button">↻</button>
             </div>
             ${homeStatusHtml()}
@@ -690,14 +889,45 @@
       `;
     }
 
+    function renderBlockHtml(block, editor = false) {
+      const wrapClass = block.wrap === false ? 'nowrap' : '';
+      const body = renderFormattedBlock(block.html || '');
+      if (editor) {
+        return `
+          <article class="block ${block.visible === false ? 'block-hidden' : ''} ${wrapClass}" data-block-id="${esc(block.id)}">
+            <div class="block-head">
+              <div class="block-meta">
+                <span>ブロック</span>
+                ${block.visible === false ? '<span class="block-badge warn">非表示</span>' : '<span class="block-badge">表示中</span>'}
+                ${block.wrap === false ? '<span class="block-badge warn">折り返しOFF</span>' : '<span class="block-badge">折り返しON</span>'}
+              </div>
+              <div class="block-actions">
+                <button class="btn small" data-block-action="settings" data-block-id="${esc(block.id)}" type="button" title="ブロック設定">⚙️</button>
+                <button class="btn small" data-block-action="edit" data-block-id="${esc(block.id)}" type="button">編集</button>
+                <button class="btn small" data-block-action="copy" data-block-id="${esc(block.id)}" type="button">複製</button>
+                <button class="btn small" data-block-action="up" data-block-id="${esc(block.id)}" type="button">↑</button>
+                <button class="btn small" data-block-action="down" data-block-id="${esc(block.id)}" type="button">↓</button>
+                <button class="btn small danger" data-block-action="delete" data-block-id="${esc(block.id)}" type="button">削除</button>
+              </div>
+            </div>
+            <div class="rendered-text ${wrapClass}">${body}</div>
+          </article>
+        `;
+      }
+
+      if (block.visible === false) return '';
+      return `
+        <article class="block ${wrapClass}">
+          <div class="rendered-text ${wrapClass}">${body}</div>
+        </article>
+      `;
+    }
+
     function renderViewer() {
       const site = state.current;
       const blocks = (site?.blocks || [])
-        .map((block) => `
-          <article class="block">
-            <div class="rendered-text">${renderFormattedBlock(block.html || '')}</div>
-          </article>
-        `).join('');
+        .map((block) => renderBlockHtml(block, false))
+        .join('');
 
       const statusHtml = canEditCurrent()
         ? `<span class="status-pill good">${state.currentAccess === 'key' ? '共同編集モード' : '編集可能'}</span>`
@@ -724,22 +954,11 @@
     function renderEditor() {
       const site = state.current;
       const blocks = (site?.blocks || []).map((block, index) => `
-        <article class="block" data-block-id="${esc(block.id)}">
-          <div class="block-head">
-            <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}</div>
-            <div class="toolbar">
-              <button class="btn small" data-block-action="edit" data-block-id="${esc(block.id)}" type="button">編集</button>
-              <button class="btn small" data-block-action="copy" data-block-id="${esc(block.id)}" type="button">複製</button>
-              <button class="btn small" data-block-action="up" data-block-id="${esc(block.id)}" type="button">↑</button>
-              <button class="btn small" data-block-action="down" data-block-id="${esc(block.id)}" type="button">↓</button>
-              <button class="btn small danger" data-block-action="delete" data-block-id="${esc(block.id)}" type="button">削除</button>
-            </div>
-          </div>
-          <div class="rendered-text">${renderFormattedBlock(block.html || '')}</div>
-        </article>
+        ${renderBlockHtml(block, true)}
       `).join('');
 
       const backLabel = state.currentSaved ? '← 戻る' : '← 一覧へ';
+      const publicText = state.current?.isPublic === false ? '非公開' : '公開';
 
       appRoot.innerHTML = `
         <div class="editor-top">
@@ -749,6 +968,7 @@
           </div>
           <div class="toolbar">
             <button class="btn" id="shareBtn" type="button">共有</button>
+            <button class="btn" id="settingsBtn" type="button">⚙️設定</button>
             <button class="btn primary" id="saveBtn" type="button">保存</button>
           </div>
         </div>
@@ -764,6 +984,10 @@
             <div class="field">
               <label for="editKeyInput">共同編集Key</label>
               <input id="editKeyInput" placeholder="例：abc123" value="${esc(site?.key || '')}">
+            </div>
+            <div class="field">
+              <label>公開状態</label>
+              <div class="status-pill ${site?.isPublic === false ? 'warn' : 'good'}">${publicText}</div>
             </div>
           </section>
 
@@ -866,14 +1090,49 @@
     function saveBlockDialog() {
       if (!state.current) return;
       const html = sanitizeRichHtml(blockInput.innerHTML.trim()) || '新しいテキスト';
+      const normalizedHtml = html;
       if (state.editingBlockId) {
         const target = state.current.blocks.find((b) => b.id === state.editingBlockId);
-        if (target) target.html = html;
+        if (target) target.html = normalizedHtml;
       } else {
-        state.current.blocks.push({ id: uid8(), html });
+        state.current.blocks.push({ id: uid8(), html: normalizedHtml, visible: true, wrap: true });
       }
       closeBlockDialog();
       render();
+    }
+
+    function openBlockSettingsDialog(blockId) {
+      if (!state.current) return;
+      const block = state.current.blocks.find((b) => b.id === blockId);
+      if (!block) return;
+      state.activeBlockSettingsId = blockId;
+      blockVisibleToggle.checked = block.visible !== false;
+      blockWrapToggle.checked = block.wrap !== false;
+      if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
+    }
+
+    function saveBlockSettingsDialog() {
+      if (!state.current || !state.activeBlockSettingsId) return;
+      const block = state.current.blocks.find((b) => b.id === state.activeBlockSettingsId);
+      if (!block) return;
+      block.visible = blockVisibleToggle.checked;
+      block.wrap = blockWrapToggle.checked;
+      blockSettingsDialog.close();
+      state.activeBlockSettingsId = null;
+      render();
+    }
+
+    function openSettingsDialog() {
+      if (!state.current) return;
+      publicToggle.checked = state.current.isPublic !== false;
+      if (!settingsDialog.open) settingsDialog.showModal();
+    }
+
+    async function saveSettingsDialog() {
+      if (!state.current) return;
+      state.current.isPublic = publicToggle.checked;
+      settingsDialog.close();
+      await saveCurrentSite(false);
     }
 
     async function loadAllSites() {
@@ -957,7 +1216,7 @@
       }, 120);
     }
 
-    async function saveCurrentSite() {
+    async function saveCurrentSite(reloadHome = true) {
       if (!state.current || !state.db) {
         alert('先にサイトを作ってね');
         return;
@@ -974,10 +1233,10 @@
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
       state.current.creatorId = state.current.creatorId || creatorId();
+      state.current.blocks = (state.current.blocks || []).map(normalizeBlock);
 
       const payload = {
         ...state.current,
-        blocks: (state.current.blocks || []).map((b) => ({ id: b.id || uid8(), html: String(b.html || '') })),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -986,7 +1245,8 @@
 
       state.currentSaved = true;
       state.current = normalizeSite(state.current.siteId, payload);
-      await loadAllSites();
+
+      if (reloadHome) await loadAllSites();
       state.mode = 'editor';
       render();
       syncCurrentUrl();
@@ -1024,7 +1284,7 @@
         state.currentAccess = 'view';
       }
 
-      state.current = site;
+      state.current = normalizeSite(site.siteId, site);
       state.currentSaved = true;
 
       if (site.isPublic === false && !canEditCurrent()) {
@@ -1040,6 +1300,45 @@
     async function refreshHomeSites() {
       await loadAllSites();
       if (state.mode === 'home') render();
+    }
+
+    async function mergeCreatorId() {
+      if (!state.db || !state.ready) return;
+
+      const oldId = creatorId();
+      const targetId = String(mergeTargetInput.value || '').trim();
+
+      if (!targetId) {
+        alert('統合先IDを入れてね');
+        return;
+      }
+      if (targetId === oldId) {
+        alert('同じIDには統合できないよ');
+        return;
+      }
+      if (!confirm(`ID「${oldId}」を「${targetId}」へ統合するよ。よろしい？`)) return;
+
+      setCookie(OWNER_COOKIE, targetId);
+      if (state.current) state.current.creatorId = targetId;
+
+      const snapshot = await getDocs(collection(state.db, COLLECTION));
+      const targets = snapshot.docs.filter((d) => (d.data() || {}).creatorId === oldId);
+
+      await Promise.allSettled(
+        targets.map((snap) =>
+          updateDoc(doc(state.db, COLLECTION, snap.id), {
+            creatorId: targetId
+          })
+        )
+      );
+
+      await loadAllSites();
+      if (state.current) {
+        state.current.creatorId = targetId;
+      }
+      idDialog.close();
+      alert('IDを統合しました。');
+      render();
     }
 
     function clearBootTimer() {
@@ -1115,11 +1414,11 @@
       }
     }
 
-    function handleClick(target) {
+    async function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
-        if (siteId) openSiteById(siteId, null, true); // 一覧から開いたら必ずURLを更新
+        if (siteId) await openSiteById(siteId, null, true); // 一覧から開いたら必ずURLを更新
         return;
       }
 
@@ -1134,6 +1433,8 @@
 
         if (action === 'edit') {
           openBlockDialog(blockId);
+        } else if (action === 'settings') {
+          openBlockSettingsDialog(blockId);
         } else if (action === 'copy') {
           state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: uid8() });
           render();
@@ -1175,7 +1476,7 @@
         location.hash = '';
         state.mode = 'home';
         render();
-        refreshHomeSites();
+        await refreshHomeSites();
         return;
       }
 
@@ -1211,8 +1512,13 @@
         return;
       }
 
+      if (target.closest('#settingsBtn')) {
+        openSettingsDialog();
+        return;
+      }
+
       if (target.closest('#saveBtn')) {
-        saveCurrentSite();
+        await saveCurrentSite();
         return;
       }
 
@@ -1231,6 +1537,27 @@
         return;
       }
 
+      if (target.closest('#blockSettingsSaveBtn')) {
+        saveBlockSettingsDialog();
+        return;
+      }
+
+      if (target.closest('#blockSettingsCloseBtn')) {
+        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        state.activeBlockSettingsId = null;
+        return;
+      }
+
+      if (target.closest('#settingsSaveBtn')) {
+        await saveSettingsDialog();
+        return;
+      }
+
+      if (target.closest('#settingsCloseBtn')) {
+        if (settingsDialog.open) settingsDialog.close();
+        return;
+      }
+
       if (target.closest('#copyIdBtn')) {
         navigator.clipboard.writeText(creatorId()).then(() => alert('IDをコピーしました')).catch(() => prompt('コピーできない場合はこれを使ってね', creatorId()));
         return;
@@ -1242,7 +1569,7 @@
       }
 
       if (target.closest('#mergeIdBtn')) {
-        alert('この版ではID統合はデモだけです。');
+        await mergeCreatorId();
         return;
       }
 
@@ -1292,11 +1619,15 @@
       }
 
       if (target.closest('#homeRefreshBtn')) {
-        refreshHomeSites();
+        await refreshHomeSites();
+        return;
       }
     }
 
-    document.addEventListener('click', (event) => handleClick(event.target));
+    document.addEventListener('click', (event) => {
+      handleClick(event.target).catch((error) => console.error(error));
+    });
+
     document.addEventListener('input', (event) => {
       const target = event.target;
       if (!target) return;
@@ -1325,13 +1656,9 @@
       if (e.key === 'Escape') closeBlockDialog();
     });
 
-    document.getElementById('blockSaveBtn').addEventListener('click', saveBlockDialog);
-    document.getElementById('blockCancelBtn').addEventListener('click', closeBlockDialog);
     ownerIdBtn.addEventListener('click', (e) => {
       e.currentTarget.textContent = `ID: ${creatorId()}`;
     });
-
-    shareDialog.addEventListener('showModal', () => syncShareDialog());
 
     window.addEventListener('hashchange', async () => {
       const route = parseRoute();
