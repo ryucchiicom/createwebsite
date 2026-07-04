@@ -443,7 +443,6 @@
       shareMode: 'view',
       authError: '',
       loadingMessage: 'Firebase接続中…',
-      loadingDots: 0
     };
 
     let bootTimer = null;
@@ -612,7 +611,7 @@
     }
 
     function renderLoading() {
-      const dots = '....'.split('').map(() => '<span></span>').join('');
+      const dots = '<span></span><span></span><span></span><span></span>';
       appRoot.innerHTML = `
         <div class="boot-wrap">
           <div class="boot-card">
@@ -670,8 +669,8 @@
             <h1>メモを書くように、サイトを作ろう。</h1>
             <p>テキストを積んで保存するだけで、共有できるWebページを作れます。保存先はFirebaseだけです。</p>
             <div class="hero-actions">
-              <button class="btn primary" id="newSiteBtn" ${state.ready ? '' : 'disabled'}>＋ 新規作成</button>
-              <button class="btn" id="showIdBtn" ${state.ready ? '' : 'disabled'}>自分のIDを見る</button>
+              <button class="btn primary" id="newSiteBtn" ${state.ready ? '' : 'disabled'} type="button">＋ 新規作成</button>
+              <button class="btn" id="showIdBtn" ${state.ready ? '' : 'disabled'} type="button">自分のIDを見る</button>
             </div>
           </div>
 
@@ -840,27 +839,6 @@
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
-    }
-
-    function openHome() {
-      state.mode = 'home';
-      render();
-    }
-
-    function openViewer(site, access = 'view', sync = true) {
-      setCurrentSite(site, true);
-      state.currentAccess = access;
-      state.mode = 'viewer';
-      render();
-      if (sync) syncCurrentUrl();
-    }
-
-    function openEditor(site, saved = true, access = 'view', sync = true) {
-      setCurrentSite(site, saved);
-      state.currentAccess = access;
-      state.mode = 'editor';
-      render();
-      if (sync) syncCurrentUrl();
     }
 
     function openNewDraft() {
@@ -1137,13 +1115,11 @@
       }
     }
 
-    appRoot.addEventListener('click', async (event) => {
-      const target = event.target;
-
+    function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
-        if (siteId) await openSiteById(siteId, null, true); // 一覧から開いたらURLも必ず更新
+        if (siteId) openSiteById(siteId, null, true); // 一覧から開いたら必ずURLを更新
         return;
       }
 
@@ -1199,7 +1175,7 @@
         location.hash = '';
         state.mode = 'home';
         render();
-        await refreshHomeSites();
+        refreshHomeSites();
         return;
       }
 
@@ -1236,7 +1212,7 @@
       }
 
       if (target.closest('#saveBtn')) {
-        await saveCurrentSite();
+        saveCurrentSite();
         return;
       }
 
@@ -1256,12 +1232,7 @@
       }
 
       if (target.closest('#copyIdBtn')) {
-        try {
-          await navigator.clipboard.writeText(creatorId());
-          alert('IDをコピーしました');
-        } catch {
-          prompt('コピーできない場合はこれを使ってね', creatorId());
-        }
+        navigator.clipboard.writeText(creatorId()).then(() => alert('IDをコピーしました')).catch(() => prompt('コピーできない場合はこれを使ってね', creatorId()));
         return;
       }
 
@@ -1286,12 +1257,7 @@
           alert('先に保存してね。');
           return;
         }
-        try {
-          await navigator.clipboard.writeText(url);
-          alert('コピーしました');
-        } catch {
-          prompt('コピーできないときはこれを使ってね', url);
-        }
+        navigator.clipboard.writeText(url).then(() => alert('コピーしました')).catch(() => prompt('コピーできないときはこれを使ってね', url));
         return;
       }
 
@@ -1302,9 +1268,7 @@
           return;
         }
         if (navigator.share) {
-          try {
-            await navigator.share({ title: state.current?.title || 'CreateWebsite', url });
-          } catch {}
+          navigator.share({ title: state.current?.title || 'CreateWebsite', url }).catch(() => {});
         } else {
           alert('このブラウザはWeb Share APIに対応していません。');
         }
@@ -1328,39 +1292,46 @@
       }
 
       if (target.closest('#homeRefreshBtn')) {
-        await refreshHomeSites();
-        return;
+        refreshHomeSites();
       }
-    });
+    }
 
-    appRoot.addEventListener('input', (event) => {
+    document.addEventListener('click', (event) => handleClick(event.target));
+    document.addEventListener('input', (event) => {
       const target = event.target;
-      if (target && target.id === 'homeSearchInput') {
+      if (!target) return;
+
+      if (target.id === 'homeSearchInput') {
         state.homeSearch = target.value;
         render();
         return;
       }
 
-      if (target && target.id === 'titleInput' && state.current) {
+      if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
         if (heading) heading.textContent = target.value || '無題のサイト';
         return;
       }
 
-      if (target && target.id === 'editKeyInput' && state.current) {
+      if (target.id === 'editKeyInput' && state.current) {
         state.current.key = target.value;
         state.current.collaborative = Boolean(String(target.value || '').trim());
         return;
       }
     });
 
+    blockDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeBlockDialog();
+    });
+
     document.getElementById('blockSaveBtn').addEventListener('click', saveBlockDialog);
     document.getElementById('blockCancelBtn').addEventListener('click', closeBlockDialog);
-
     ownerIdBtn.addEventListener('click', (e) => {
       e.currentTarget.textContent = `ID: ${creatorId()}`;
     });
+
+    shareDialog.addEventListener('showModal', () => syncShareDialog());
 
     window.addEventListener('hashchange', async () => {
       const route = parseRoute();
