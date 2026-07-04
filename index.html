@@ -8,9 +8,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <style>
     :root{
-      color-scheme: light;
+      color-scheme: light dark;
       --bg:#f6f7fb;
-      --card:rgba(255,255,255,.92);
+      --surface:#ffffff;
+      --surface-soft:rgba(255,255,255,.92);
+      --surface-ghost:rgba(255,255,255,.58);
+      --surface-muted:#f8fafc;
+      --surface-dialog:#ffffff;
       --ink:#1c2430;
       --muted:#667085;
       --line:#e4e7ec;
@@ -20,7 +24,33 @@
       --danger:#ef4444;
       --shadow:0 18px 50px rgba(28,36,48,.12);
       --radius:22px;
+      --topbar-height:0px;
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b1220;
+        --surface:#111827;
+        --surface-soft:rgba(17,24,39,.90);
+        --surface-ghost:rgba(17,24,39,.68);
+        --surface-muted:#0f172a;
+        --surface-dialog:#111827;
+        --ink:#e5e7eb;
+        --muted:#94a3b8;
+        --line:#334155;
+        --brand:#8b8cff;
+        --brand-dark:#6f72ff;
+        --accent:#2dd4bf;
+        --danger:#f87171;
+        --shadow:0 18px 50px rgba(0,0,0,.35);
+      }
+      body{
+        background:
+          radial-gradient(circle at top left, rgba(139,140,255,.16), transparent 34rem),
+          radial-gradient(circle at 100% 10%, rgba(45,212,191,.12), transparent 28rem),
+          var(--bg);
+      }
     }
 
     *{box-sizing:border-box}
@@ -38,7 +68,13 @@
     button,input,textarea,select{font:inherit}
     button{cursor:pointer;border:0}
     textarea{resize:vertical}
-    .app-shell{width:min(1120px,100%);margin:0 auto;padding:20px 16px 140px}
+    .app-shell{
+      width:min(1120px,100%);
+      margin:0 auto;
+      padding:20px 16px 140px;
+      position:relative;
+      z-index:1;
+    }
     .hidden{display:none !important}
 
     .hero{
@@ -50,8 +86,8 @@
     }
 
     .panel{
-      background:var(--card);
-      border:1px solid rgba(255,255,255,.74);
+      background:var(--surface-soft);
+      border:1px solid color-mix(in srgb, var(--surface) 76%, transparent);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
       padding:22px;
@@ -77,7 +113,7 @@
       border-radius:999px;
       padding:0 18px;
       font-weight:800;
-      background:#fff;
+      background:var(--surface);
       color:var(--ink);
       box-shadow:inset 0 0 0 1px var(--line);
     }
@@ -104,7 +140,7 @@
       width:100%;
       border-radius:20px;
       padding:16px;
-      background:#fff;
+      background:var(--surface);
       border:1px solid var(--line);
       transition:transform .15s, box-shadow .15s;
     }
@@ -128,14 +164,14 @@
       border:1px solid var(--line);
       border-radius:16px;
       padding:12px 14px;
-      background:#fff;
+      background:var(--surface);
       color:var(--ink);
     }
 
     .canvas{
       min-height:52vh;
       padding:18px;
-      background:rgba(255,255,255,.58);
+      background:var(--surface-ghost);
       border:1px dashed #cdd3df;
       border-radius:var(--radius);
     }
@@ -143,7 +179,7 @@
     .empty{text-align:center;padding:60px 14px;color:var(--muted)}
 
     .block{
-      background:#fff;
+      background:var(--surface);
       border:1px solid var(--line);
       border-radius:18px;
       padding:14px;
@@ -166,10 +202,14 @@
       white-space:pre-wrap;
       line-height:1.8;
       word-break:break-word;
+      max-width:100%;
     }
     .rendered-text.no-wrap{
       white-space:nowrap;
       overflow-x:auto;
+      overflow-y:hidden;
+      display:block;
+      -webkit-overflow-scrolling:touch;
     }
 
     .rich-editor{
@@ -177,7 +217,7 @@
       border:1px solid var(--line);
       border-radius:16px;
       padding:12px 14px;
-      background:#fff;
+      background:var(--surface);
       line-height:1.8;
       outline:none;
     }
@@ -197,11 +237,12 @@
       align-items:center;
       justify-content:space-between;
       padding:12px;
-      background:rgba(255,255,255,.94);
+      background:var(--surface-soft);
       border:1px solid var(--line);
       border-radius:999px;
       box-shadow:var(--shadow);
-      z-index:30;
+      z-index:50;
+      pointer-events:auto;
     }
     .bottom-add-bar span{color:var(--muted);font-weight:700;padding-left:12px}
 
@@ -211,6 +252,8 @@
       border-radius:26px;
       padding:0;
       box-shadow:var(--shadow);
+      background:var(--surface-dialog);
+      color:var(--ink);
     }
     dialog::backdrop{
       background:rgba(15,23,42,.42);
@@ -224,23 +267,24 @@
       place-items:center;
       margin:10px auto 16px;
       border-radius:20px;
-      background:#f2f4f7;
+      background:var(--surface-muted);
       color:var(--muted);
       overflow:hidden;
     }
     .share-url{
       word-break:break-all;
-      background:#f8fafc;
+      background:var(--surface-muted);
       border:1px solid var(--line);
       border-radius:16px;
       padding:12px;
     }
     .tab{
-      background:#fff;
+      background:var(--surface);
       border:1px solid var(--line);
       border-radius:999px;
       padding:9px 14px;
       font-weight:800;
+      color:var(--ink);
     }
     .tab.active{
       color:#fff;
@@ -252,14 +296,15 @@
       display:inline-flex;
       gap:8px;
       align-items:center;
-      background:#fff;
+      background:var(--surface);
       border:1px solid var(--line);
       border-radius:999px;
       padding:8px 12px;
+      color:var(--ink);
     }
     .notice{
-      background:#eef2ff;
-      color:#3730a3;
+      background:color-mix(in srgb, var(--brand) 14%, var(--surface));
+      color:color-mix(in srgb, var(--brand) 55%, var(--ink));
       border-radius:16px;
       padding:12px;
       line-height:1.7;
@@ -272,7 +317,7 @@
       padding:8px 12px;
       border-radius:999px;
       border:1px solid var(--line);
-      background:#fff;
+      background:var(--surface);
       color:var(--muted);
       font-weight:800;
       font-size:.88rem;
@@ -288,8 +333,8 @@
     }
     .boot-card{
       width:min(640px,100%);
-      background:var(--card);
-      border:1px solid rgba(255,255,255,.74);
+      background:var(--surface-soft);
+      border:1px solid color-mix(in srgb, var(--surface) 76%, transparent);
       border-radius:28px;
       box-shadow:var(--shadow);
       padding:28px;
@@ -521,7 +566,6 @@
       authError: '',
       loadingMessage: 'Firebase接続中…',
       pendingBlockSettingsId: null,
-      pendingSiteSettingsOpen: false,
     };
 
     let bootTimer = null;
@@ -782,17 +826,12 @@
       `;
     }
 
-    function blockRenderStyle(block) {
-      const wrap = block.wrap !== false;
-      return wrap ? '' : ' no-wrap';
-    }
-
     function renderViewer() {
       const site = state.current;
       const blocks = (site?.blocks || [])
         .filter((block) => block.visible !== false)
         .map((block) => `
-          <article class="block ${block.visible === false ? 'hidden-block' : ''}">
+          <article class="block">
             <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${renderFormattedBlock(block.html || '')}</div>
           </article>
         `).join('');
@@ -807,7 +846,6 @@
             <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
             <div class="toolbar" style="justify-content:flex-end">
               ${statusHtml}
-              <button class="btn" id="siteSettingsBtn" type="button" ${canEditCurrent() ? '' : 'disabled'}>⚙️ 設定</button>
               <button class="btn" id="viewerShareBtn" type="button">共有</button>
               <button class="btn primary" id="viewerEditBtn" type="button" ${canEditCurrent() ? '' : 'hidden'}>編集する</button>
             </div>
@@ -879,10 +917,14 @@
           <section class="panel">
             <div class="toolbar" style="justify-content:space-between;margin-bottom:12px">
               <h3>本文</h3>
-              <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
             </div>
             <div class="canvas" id="blockCanvas">${blocks || '<div class="empty">下の「＋ 追加」から本文を追加してください。</div>'}</div>
           </section>
+        </div>
+
+        <div class="bottom-add-bar" id="bottomAddBar">
+          <span>下からブロックを追加できます</span>
+          <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
         </div>
       `;
     }
@@ -1026,7 +1068,7 @@
       render();
     }
 
-    function showShareDialog() {
+    function showShareModal() {
       if (!state.current) {
         alert('先にサイトを開いてください。');
         return;
@@ -1071,7 +1113,7 @@
       }, 120);
     }
 
-    function openSiteSettingsDialog() {
+    function openSiteSettingsModal() {
       if (!state.current) return;
       sitePublicToggle.checked = state.current.isPublic !== false;
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
@@ -1089,11 +1131,10 @@
 
       await loadAllSites();
       render();
-      if (state.mode === 'viewer' || state.mode === 'editor') syncCurrentUrl();
       if (siteSettingsDialog.open) siteSettingsDialog.close();
     }
 
-    function openBlockSettingsDialog(blockId) {
+    function openBlockSettingsModal(blockId) {
       if (!state.current || !blockId) return;
       const target = state.current.blocks.find((b) => b.id === blockId);
       if (!target) return;
@@ -1123,7 +1164,7 @@
       state.pendingBlockSettingsId = null;
     }
 
-    function openMergeDialog() {
+    function openMergeModal() {
       mergeTargetInput.value = '';
       if (!mergeDialog.open) mergeDialog.showModal();
       requestAnimationFrame(() => mergeTargetInput.focus());
@@ -1354,7 +1395,7 @@
         if (action === 'edit') {
           openBlockDialog(blockId);
         } else if (action === 'settings') {
-          openBlockSettingsDialog(blockId);
+          openBlockSettingsModal(blockId);
         } else if (action === 'copy') {
           state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: uid8() });
           render();
@@ -1432,12 +1473,12 @@
           alert('編集できる人だけ設定できます。');
           return;
         }
-        openSiteSettingsDialog();
+        openSiteSettingsModal();
         return;
       }
 
       if (target.closest('#viewerShareBtn') || target.closest('#shareBtn')) {
-        showShareDialog();
+        showShareModal();
         return;
       }
 
@@ -1493,7 +1534,7 @@
       }
 
       if (target.closest('#mergeIdBtn')) {
-        openMergeDialog();
+        openMergeModal();
         return;
       }
 
