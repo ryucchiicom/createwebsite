@@ -67,6 +67,7 @@
     button,input,textarea,select{font:inherit}
     button{cursor:pointer;border:0}
     textarea{resize:vertical}
+
     .app-shell{
       width:min(1120px,100%);
       margin:0 auto;
@@ -74,6 +75,7 @@
       position:relative;
       z-index:1;
     }
+
     .hidden{display:none !important}
 
     .hero{
@@ -93,9 +95,19 @@
       backdrop-filter:blur(14px);
     }
 
-    .eyebrow{color:var(--brand);font-weight:800;letter-spacing:.08em;font-size:.78rem}
+    .eyebrow{
+      color:var(--brand);
+      font-weight:800;
+      letter-spacing:.08em;
+      font-size:.78rem;
+    }
+
     h1,h2,h3{margin:0;line-height:1.15}
-    h1{font-size:clamp(2rem,7vw,4.5rem);letter-spacing:-.06em;margin-top:8px}
+    h1{
+      font-size:clamp(2rem,7vw,4.5rem);
+      letter-spacing:-.06em;
+      margin-top:8px;
+    }
     h2{font-size:clamp(1.35rem,4vw,2.1rem)}
     h3{font-size:1.15rem}
     p{color:var(--muted);line-height:1.8}
@@ -225,19 +237,14 @@
       line-height:1.8;
       word-break:break-word;
       max-width:100%;
-      cursor:text;
       user-select:none;
       -webkit-user-select:none;
       -webkit-touch-callout:none;
       touch-action:manipulation;
       padding:2px 0;
+      caret-color:var(--brand);
     }
-    .editor-text:focus{
-      outline:none;
-      user-select:text;
-      -webkit-user-select:text;
-      -webkit-touch-callout:default;
-    }
+    .editor-text:focus{outline:none}
 
     .rich-editor{
       min-height:180px;
@@ -272,16 +279,13 @@
       pointer-events:auto;
       backdrop-filter: blur(10px);
     }
-
-    .add-btn{
+    .bottom-add-bar .btn.primary{
       background:color-mix(in srgb, var(--surface) 84%, var(--brand) 16%);
       color:var(--ink);
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--brand) 28%, var(--line));
-      font-weight:900;
-      min-width:120px;
+      box-shadow:inset 0 0 0 1px var(--line);
     }
-    .add-btn:hover{
-      background:color-mix(in srgb, var(--surface) 76%, var(--brand) 24%);
+    .bottom-add-bar .btn.primary:hover{
+      background:color-mix(in srgb, var(--surface) 74%, var(--brand) 26%);
     }
 
     .home-gear-btn{
@@ -662,11 +666,6 @@
       return Math.random().toString(36).slice(2, 10);
     }
 
-    function cssEscapeValue(value) {
-      if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(String(value));
-      return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-    }
-
     function esc(value) {
       return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -682,22 +681,42 @@
       return div.innerText || div.textContent || '';
     }
 
-    function editableSourceHtml(source) {
-      return esc(String(source ?? '')).replace(/\n/g, '<br>');
+    function sanitizeRichHtml(value) {
+      const template = document.createElement('template');
+      template.innerHTML = String(value ?? '');
+
+      template.content.querySelectorAll('*').forEach((node) => {
+        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(node.tagName)) {
+          node.replaceWith(...node.childNodes);
+          return;
+        }
+
+        if (node.tagName === 'SPAN') {
+          const color = node.style.color;
+          const fontSize = node.style.fontSize;
+          node.removeAttribute('style');
+          if (color) node.style.color = color;
+          if (fontSize) node.style.fontSize = fontSize;
+        } else {
+          [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+        }
+      });
+
+      return template.innerHTML;
     }
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
       let html = '';
-      let mode = null;
-      let value = '';
+      let color = '';
+      let size = '';
       let spanOpen = false;
 
       const currentStyle = () => {
-        if (!mode) return '';
-        if (mode === 'color') return `color:${value}`;
-        if (mode === 'size') return `font-size:${value}px`;
-        return '';
+        const styles = [];
+        if (color) styles.push(`color:${color}`);
+        if (size) styles.push(`font-size:${size}px`);
+        return styles.join(';');
       };
 
       const closeSpan = () => {
@@ -714,54 +733,51 @@
         spanOpen = true;
       };
 
-      const restartSpan = () => {
+      const rebuildSpan = () => {
         closeSpan();
-        openSpan();
+        if (color || size) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
+        const ch = text[i];
         const rest = text.slice(i);
 
         const colorMatch = rest.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
         if (colorMatch) {
-          mode = 'color';
-          value = `#${colorMatch[1]}`;
-          restartSpan();
+          color = `#${colorMatch[1]}`;
+          size = '';
+          rebuildSpan();
           i += colorMatch[0].length;
           continue;
         }
 
         const sizeMatch = rest.match(/^S(\d{1,3})(['’])/);
         if (sizeMatch) {
-          mode = 'size';
-          value = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          restartSpan();
+          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          color = '';
+          rebuildSpan();
           i += sizeMatch[0].length;
           continue;
         }
 
-        const ch = text[i];
         if (ch === "'" || ch === '’') {
-          mode = null;
-          value = '';
           closeSpan();
+          color = '';
+          size = '';
           i += 1;
           continue;
         }
 
-        if (ch === '\n') {
-          html += '<br>';
-          i += 1;
-          continue;
-        }
+        if (!spanOpen && (color || size)) openSpan();
 
-        if (mode && !spanOpen) openSpan();
-        html += esc(ch);
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
+
         i += 1;
       }
 
       closeSpan();
-      return html || '<br>';
+      return html;
     }
 
     function getCookie(name) {
@@ -841,27 +857,18 @@
         ? block.source
         : htmlToPlainText(block.html || '');
 
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : parseStyledSource(source);
+
       return {
         id: block.id || uid8(),
         source,
-        html: parseStyledSource(source),
+        html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
         heightEnabled: block.heightEnabled === true,
         rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
-      };
-    }
-
-    function serializeBlock(block = {}) {
-      const normalized = normalizeBlock(block);
-      return {
-        id: normalized.id,
-        source: normalized.source,
-        html: normalized.html,
-        visible: normalized.visible,
-        wrap: normalized.wrap,
-        heightEnabled: normalized.heightEnabled,
-        rows: normalized.rows
       };
     }
 
@@ -915,7 +922,7 @@
     function siteSearchText(site) {
       const blockText = (site.blocks || [])
         .filter((b) => b.visible !== false)
-        .map((b) => String(b.source || htmlToPlainText(b.html || '')).replace(/<[^>]+>/g, ' '))
+        .map((b) => String(b.html || '').replace(/<[^>]+>/g, ' '))
         .join(' ');
       return `${site.title || ''} ${blockText}`.toLowerCase();
     }
@@ -1035,7 +1042,7 @@
         .filter((block) => block.visible !== false)
         .map((block) => `
           <article class="block" style="${blockHeightStyle(block)}">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${parseStyledSource(block.source || '')}</div>
+            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
           </article>
         `).join('');
 
@@ -1069,7 +1076,7 @@
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${editableSourceHtml(normalized.source || '')}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1116,7 +1123,7 @@
         </div>
 
         <div class="bottom-add-bar" id="bottomAddBar" style="background:${addBarBackground()};">
-          <button class="btn add-btn" id="addBlockBtn" type="button">＋ 追加</button>
+          <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
         </div>
       `;
     }
@@ -1178,7 +1185,7 @@
         creatorId: creatorId(),
         key: '',
         blocks: [
-          { id: uid8(), source: "こんにちは\n太字も使えるよ\n#ff0000'赤文字'", visible: true, wrap: true, heightEnabled: false, rows: 3 }
+          { id: uid8(), source: "こんにちは\n太字も使えるよ\n#ff0000'赤文字'", html: "こんにちは<br>太字も使えるよ<br><span style=\"color:#ff0000\">赤文字</span>", visible: true, wrap: true, heightEnabled: false, rows: 3 }
         ],
         isPublic: true,
         collaborative: false,
@@ -1195,23 +1202,6 @@
       location.hash = '#/create';
     }
 
-    function openEditorScreen(site, saved = true, access = 'view', sync = true) {
-      setCurrentSite(site, saved);
-      state.currentAccess = access;
-      state.mode = 'editor';
-      renderApp();
-      if (sync) syncCurrentUrl();
-      focusBlockByIdIfNeeded();
-    }
-
-    function openViewerScreen(site, access = 'view', sync = true) {
-      setCurrentSite(site, true);
-      state.currentAccess = access;
-      state.mode = 'viewer';
-      renderApp();
-      if (sync) syncCurrentUrl();
-    }
-
     function placeCaretAtEnd(el) {
       if (!el) return;
       const selection = window.getSelection();
@@ -1221,16 +1211,6 @@
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
-    }
-
-    function focusBlockByIdIfNeeded() {
-      if (!state.editingBlockId) return;
-      const el = appRoot.querySelector(`[data-editor-block="${cssEscapeValue(state.editingBlockId)}"]`);
-      if (!el) return;
-      requestAnimationFrame(() => {
-        el.focus?.();
-        placeCaretAtEnd(el);
-      });
     }
 
     function openBlockSettingsModal(blockId = null) {
@@ -1349,6 +1329,12 @@
       renderApp();
     }
 
+    async function saveHomeSettings() {
+      localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
+      if (homeSettingsDialog.open) homeSettingsDialog.close();
+      if (state.mode === 'editor') renderApp();
+    }
+
     async function saveSiteSettings() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
@@ -1417,7 +1403,15 @@
       state.current.updatedAt = Date.now();
 
       setDoc(doc(state.db, COLLECTION, state.current.siteId), {
-        blocks: state.current.blocks.map(serializeBlock),
+        blocks: state.current.blocks.map((b) => ({
+          id: b.id,
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
+          visible: b.visible !== false,
+          wrap: b.wrap !== false,
+          heightEnabled: b.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+        })),
         updatedAt: state.current.updatedAt
       }, { merge: true }).then(async () => {
         await loadAllSites();
@@ -1489,7 +1483,15 @@
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks.map(serializeBlock),
+        blocks: state.current.blocks.map((b) => ({
+          id: b.id,
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
+          visible: b.visible !== false,
+          wrap: b.wrap !== false,
+          heightEnabled: b.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+        })),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1585,11 +1587,10 @@
       renderApp();
     }
 
-    function focusBlockByIdIfNeeded() {
-      if (!state.editingBlockId) return;
-      const el = appRoot.querySelector(`[data-editor-block="${cssEscapeValue(state.editingBlockId)}"]`);
-      if (!el) return;
+    function focusEditorBlockById(blockId) {
       requestAnimationFrame(() => {
+        const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(blockId)}"]`);
+        if (!el) return;
         el.focus?.();
         placeCaretAtEnd(el);
       });
@@ -1600,6 +1601,7 @@
       const block = normalizeBlock({
         id: uid8(),
         source: '',
+        html: '',
         visible: true,
         wrap: true,
         heightEnabled: false,
@@ -1609,7 +1611,7 @@
       state.currentSaved = false;
       renderApp();
       state.editingBlockId = block.id;
-      focusBlockByIdIfNeeded();
+      focusEditorBlockById(block.id);
     }
 
     function updateEditableBlockFromDom(blockId, element) {
@@ -1618,13 +1620,18 @@
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = parseStyledSource(raw);
-      state.currentSaved = false;
-    }
+      const html = parseStyledSource(raw);
 
-    function drawSettingsModalOnCurrentIfAny() {
-      if (state.mode === 'editor') renderApp();
+      state.current.blocks[idx].source = raw;
+      state.current.blocks[idx].html = html || '<br>';
+      state.currentSaved = false;
+
+      const selectionKeep = document.activeElement === element;
+      const nextHtml = html || '<br>';
+      if (element.innerHTML !== nextHtml) {
+        element.innerHTML = nextHtml;
+        if (selectionKeep) placeCaretAtEnd(element);
+      }
     }
 
     function handleClick(target) {
@@ -1665,6 +1672,7 @@
 
         if (editorBlock) {
           editorBlock.focus?.();
+          placeCaretAtEnd(editorBlock);
           return;
         }
       }
@@ -1899,10 +1907,6 @@
 
       if (target.id === 'blockHeightToggle') {
         blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
-        return;
-      }
-
-      if (target.id === 'blockRowsInput') {
         return;
       }
 
