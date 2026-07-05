@@ -67,7 +67,6 @@
     button,input,textarea,select{font:inherit}
     button{cursor:pointer;border:0}
     textarea{resize:vertical}
-
     .app-shell{
       width:min(1120px,100%);
       margin:0 auto;
@@ -75,7 +74,6 @@
       position:relative;
       z-index:1;
     }
-
     .hidden{display:none !important}
 
     .hero{
@@ -95,19 +93,9 @@
       backdrop-filter:blur(14px);
     }
 
-    .eyebrow{
-      color:var(--brand);
-      font-weight:800;
-      letter-spacing:.08em;
-      font-size:.78rem;
-    }
-
+    .eyebrow{color:var(--brand);font-weight:800;letter-spacing:.08em;font-size:.78rem}
     h1,h2,h3{margin:0;line-height:1.15}
-    h1{
-      font-size:clamp(2rem,7vw,4.5rem);
-      letter-spacing:-.06em;
-      margin-top:8px;
-    }
+    h1{font-size:clamp(2rem,7vw,4.5rem);letter-spacing:-.06em;margin-top:8px}
     h2{font-size:clamp(1.35rem,4vw,2.1rem)}
     h3{font-size:1.15rem}
     p{color:var(--muted);line-height:1.8}
@@ -242,7 +230,6 @@
       -webkit-touch-callout:none;
       touch-action:manipulation;
       padding:2px 0;
-      caret-color:var(--brand);
     }
     .editor-text:focus{outline:none}
 
@@ -272,20 +259,17 @@
       justify-content:center;
       padding:12px;
       background:var(--surface-soft);
-      border:1px solid var(--line);
+      border:none;
       border-radius:999px;
       box-shadow:var(--shadow);
       z-index:50;
       pointer-events:auto;
       backdrop-filter: blur(10px);
     }
-    .bottom-add-bar .btn.primary{
-      background:color-mix(in srgb, var(--surface) 84%, var(--brand) 16%);
+    .bottom-add-bar .add-btn{
+      background:color-mix(in srgb, var(--surface) 72%, transparent);
       color:var(--ink);
-      box-shadow:inset 0 0 0 1px var(--line);
-    }
-    .bottom-add-bar .btn.primary:hover{
-      background:color-mix(in srgb, var(--surface) 74%, var(--brand) 26%);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent);
     }
 
     .home-gear-btn{
@@ -443,6 +427,9 @@
         border-radius:24px;
         align-items:stretch;
         flex-direction:column;
+      }
+      .bottom-add-bar .add-btn{
+        width:100%;
       }
       .home-gear-btn{
         top:12px;
@@ -659,7 +646,6 @@
     };
 
     let longPressTimer = null;
-    let longPressCandidateId = null;
 
     function uid8() {
       if (crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
@@ -708,14 +694,14 @@
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
       let html = '';
-      let color = '';
-      let size = '';
+      let activeColor = '';
+      let activeSize = '';
       let spanOpen = false;
 
-      const currentStyle = () => {
+      const styleString = () => {
         const styles = [];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${size}px`);
+        if (activeColor) styles.push(`color:${activeColor}`);
+        if (activeSize) styles.push(`font-size:${activeSize}px`);
         return styles.join(';');
       };
 
@@ -727,57 +713,52 @@
       };
 
       const openSpan = () => {
-        const style = currentStyle();
+        const style = styleString();
         if (!style) return;
         html += `<span style="${style}">`;
         spanOpen = true;
       };
 
-      const rebuildSpan = () => {
+      const refreshSpan = () => {
         closeSpan();
-        if (color || size) openSpan();
+        if (activeColor || activeSize) openSpan();
       };
 
-      for (let i = 0; i < text.length;) {
-        const ch = text[i];
-        const rest = text.slice(i);
+      for (let i = 0; i < text.length; ) {
+        const remain = text.slice(i);
 
-        const colorMatch = rest.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
+        const colorMatch = remain.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
         if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          size = '';
-          rebuildSpan();
+          activeColor = `#${colorMatch[1]}`;
+          refreshSpan();
           i += colorMatch[0].length;
           continue;
         }
 
-        const sizeMatch = rest.match(/^S(\d{1,3})(['’])/);
+        const sizeMatch = remain.match(/^S(\d{1,3})(['’])/);
         if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          color = '';
-          rebuildSpan();
+          activeSize = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          refreshSpan();
           i += sizeMatch[0].length;
           continue;
         }
 
+        const ch = text[i];
         if (ch === "'" || ch === '’') {
           closeSpan();
-          color = '';
-          size = '';
+          activeColor = '';
+          activeSize = '';
           i += 1;
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
-
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
-
         i += 1;
       }
 
       closeSpan();
-      return html;
+      return html || '<br>';
     }
 
     function getCookie(name) {
@@ -853,18 +834,12 @@
     }
 
     function normalizeBlock(block = {}) {
-      const source = typeof block.source === 'string'
-        ? block.source
-        : htmlToPlainText(block.html || '');
-
-      const html = typeof block.html === 'string' && block.html.trim()
-        ? sanitizeRichHtml(block.html)
-        : parseStyledSource(source);
-
       return {
         id: block.id || uid8(),
-        source,
-        html,
+        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
+        html: typeof block.html === 'string' && block.html.trim()
+          ? sanitizeRichHtml(block.html)
+          : parseStyledSource(typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '')),
         visible: block.visible !== false,
         wrap: block.wrap !== false,
         heightEnabled: block.heightEnabled === true,
@@ -922,7 +897,7 @@
     function siteSearchText(site) {
       const blockText = (site.blocks || [])
         .filter((b) => b.visible !== false)
-        .map((b) => String(b.html || '').replace(/<[^>]+>/g, ' '))
+        .map((b) => String(b.source || b.html || '').replace(/<[^>]+>/g, ' '))
         .join(' ');
       return `${site.title || ''} ${blockText}`.toLowerCase();
     }
@@ -1056,7 +1031,6 @@
             <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
             <div class="toolbar" style="justify-content:flex-end">
               ${statusHtml}
-              <button class="btn" id="viewerShareBtn" type="button">共有</button>
               <button class="btn primary" id="viewerEditBtn" type="button" ${canEditCurrent() ? '' : 'hidden'}>編集する</button>
             </div>
           </div>
@@ -1076,7 +1050,7 @@
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${esc(normalized.source || '')}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1123,7 +1097,7 @@
         </div>
 
         <div class="bottom-add-bar" id="bottomAddBar" style="background:${addBarBackground()};">
-          <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
+          <button class="btn add-btn" id="addBlockBtn" type="button">＋ 追加</button>
         </div>
       `;
     }
@@ -1200,6 +1174,22 @@
       const draft = createDraftSite();
       openEditorScreen(draft, false, 'owner', false);
       location.hash = '#/create';
+    }
+
+    function openEditorScreen(site, saved = true, access = 'view', sync = true) {
+      setCurrentSite(site, saved);
+      state.currentAccess = access;
+      state.mode = 'editor';
+      renderApp();
+      if (sync) syncCurrentUrl();
+    }
+
+    function openViewerScreen(site, access = 'view', sync = true) {
+      setCurrentSite(site, true);
+      state.currentAccess = access;
+      state.mode = 'viewer';
+      renderApp();
+      if (sync) syncCurrentUrl();
     }
 
     function placeCaretAtEnd(el) {
@@ -1563,7 +1553,6 @@
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
-      longPressCandidateId = null;
     }
 
     function handleLongPressCandidate(blockId) {
@@ -1587,15 +1576,6 @@
       renderApp();
     }
 
-    function focusEditorBlockById(blockId) {
-      requestAnimationFrame(() => {
-        const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(blockId)}"]`);
-        if (!el) return;
-        el.focus?.();
-        placeCaretAtEnd(el);
-      });
-    }
-
     function addNewBlock() {
       if (!state.current) return;
       const block = normalizeBlock({
@@ -1611,7 +1591,7 @@
       state.currentSaved = false;
       renderApp();
       state.editingBlockId = block.id;
-      focusEditorBlockById(block.id);
+      focusBlockByIdIfNeeded();
     }
 
     function updateEditableBlockFromDom(blockId, element) {
@@ -1625,13 +1605,16 @@
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
       state.currentSaved = false;
+    }
 
-      const selectionKeep = document.activeElement === element;
-      const nextHtml = html || '<br>';
-      if (element.innerHTML !== nextHtml) {
-        element.innerHTML = nextHtml;
-        if (selectionKeep) placeCaretAtEnd(element);
-      }
+    function focusBlockByIdIfNeeded() {
+      if (!state.editingBlockId) return;
+      const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(state.editingBlockId)}"]`);
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.focus?.();
+        placeCaretAtEnd(el);
+      });
     }
 
     function handleClick(target) {
@@ -1672,7 +1655,6 @@
 
         if (editorBlock) {
           editorBlock.focus?.();
-          placeCaretAtEnd(editorBlock);
           return;
         }
       }
@@ -1927,7 +1909,6 @@
       if (!blockId) return;
 
       clearLongPressTimer();
-      longPressCandidateId = blockId;
       longPressTimer = setTimeout(() => {
         handleLongPressCandidate(blockId);
       }, 500);
