@@ -126,6 +126,11 @@
     .btn.ghost{background:transparent}
     .btn.small{min-height:36px;padding:0 12px;font-size:.9rem}
     .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn.add{
+      background: color-mix(in srgb, var(--surface) 80%, var(--brand) 20%);
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, var(--line));
+    }
 
     .site-grid{
       display:grid;
@@ -436,7 +441,7 @@
   <dialog id="homeSettingsDialog">
     <div class="dialog-body">
       <h2>画面設定</h2>
-      <p>下の「＋ 追加」バーの透過度を変えられます。今後ここに設定を増やしていけます。</p>
+      <p>下の「＋ 追加」バーの透過度を変えられます。</p>
 
       <div class="field">
         <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
@@ -481,7 +486,7 @@
   <dialog id="blockSettingsDialog">
     <div class="dialog-body">
       <h2>ブロック設定</h2>
-      <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
+      <p>表示方法を調整できます。</p>
 
       <div class="field">
         <label>
@@ -622,13 +627,13 @@
       db: null,
       uid: '',
       ready: false,
-      mode: 'loading', // loading | home | viewer | editor | missing | denied | boot-failed
+      mode: 'loading',
       homeSites: [],
       homeTab: 'mine',
       homeSearch: '',
       current: null,
       currentSaved: false,
-      currentAccess: 'view', // view | owner | collaborator | key
+      currentAccess: 'view',
       editingBlockId: null,
       shareMode: 'view',
       authError: '',
@@ -638,7 +643,6 @@
     };
 
     let longPressTimer = null;
-    let longPressCandidateId = null;
 
     function uid8() {
       if (crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
@@ -691,7 +695,7 @@
       let size = '';
       let spanOpen = false;
 
-      const currentStyle = () => {
+      const styleText = () => {
         const styles = [];
         if (color) styles.push(`color:${color}`);
         if (size) styles.push(`font-size:${size}px`);
@@ -706,36 +710,37 @@
       };
 
       const openSpan = () => {
-        const style = currentStyle();
+        const style = styleText();
         if (!style) return;
         html += `<span style="${style}">`;
         spanOpen = true;
       };
 
-      const reopen = () => {
+      const refreshSpan = () => {
         closeSpan();
-        if (color || size) openSpan();
+        if (styleText()) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
+        const rest = text.slice(i);
+
+        const colorToken = rest.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
+        if (colorToken) {
+          color = `#${colorToken[1]}`;
+          refreshSpan();
+          i += colorToken[0].length;
+          continue;
+        }
+
+        const sizeToken = rest.match(/^S(\d{1,3})(['’])/);
+        if (sizeToken) {
+          size = String(Math.max(1, Math.min(256, Number(sizeToken[1]) || 16)));
+          refreshSpan();
+          i += sizeToken[0].length;
+          continue;
+        }
+
         const ch = text[i];
-
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
-        if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          reopen();
-          i += colorMatch[0].length;
-          continue;
-        }
-
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})(['’])/);
-        if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
-          i += sizeMatch[0].length;
-          continue;
-        }
-
         if (ch === "'" || ch === '’') {
           closeSpan();
           color = '';
@@ -744,16 +749,14 @@
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
+        if (!spanOpen && styleText()) openSpan();
 
-        if (ch === '\n') html += '<br>';
-        else html += esc(ch);
-
+        html += ch === '\n' ? '<br>' : esc(ch);
         i += 1;
       }
 
       closeSpan();
-      return html;
+      return html || '<br>';
     }
 
     function getCookie(name) {
@@ -938,7 +941,7 @@
               <div class="loader" aria-hidden="true">${dots}</div>
               <p style="margin:0">${esc(state.authError || '接続を待っています。')}</p>
             </div>
-            <p>読み込みが終わるまで少し待ってね。失敗したら再読み込みできます。</p>
+            <p>読み込みが終わるまで少し待ってね。</p>
           </div>
         </div>
       `;
@@ -1095,7 +1098,7 @@
         </div>
 
         <div class="bottom-add-bar" id="bottomAddBar" style="background:${addBarBackground()};">
-          <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
+          <button class="btn add" id="addBlockBtn" type="button">＋ 追加</button>
         </div>
       `;
     }
@@ -1180,7 +1183,6 @@
       state.mode = 'editor';
       renderApp();
       if (sync) syncCurrentUrl();
-      focusBlockByIdIfNeeded();
     }
 
     function openViewerScreen(site, access = 'view', sync = true) {
@@ -1189,16 +1191,6 @@
       state.mode = 'viewer';
       renderApp();
       if (sync) syncCurrentUrl();
-    }
-
-    function focusBlockByIdIfNeeded() {
-      if (!state.editingBlockId) return;
-      const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(state.editingBlockId)}"]`);
-      if (!el) return;
-      requestAnimationFrame(() => {
-        el.focus?.();
-        placeCaretAtEnd(el);
-      });
     }
 
     function placeCaretAtEnd(el) {
@@ -1328,13 +1320,7 @@
       renderApp();
     }
 
-    async function saveHomeSettings() {
-      localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      if (homeSettingsDialog.open) homeSettingsDialog.close();
-      if (state.mode === 'editor') renderApp();
-    }
-
-    async function saveSiteSettings() {
+    function saveSiteSettings() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
       state.current.isPublic = !!sitePublicToggle.checked;
@@ -1342,20 +1328,20 @@
       state.current.collaborative = Boolean(state.current.key);
       state.current.updatedAt = Date.now();
 
-      await setDoc(doc(state.db, COLLECTION, state.current.siteId), {
+      setDoc(doc(state.db, COLLECTION, state.current.siteId), {
         isPublic: state.current.isPublic,
         key: state.current.key,
         collaborative: state.current.collaborative,
         updatedAt: state.current.updatedAt
-      }, { merge: true });
-
-      await loadAllSites();
-      if (siteSettingsDialog.open) siteSettingsDialog.close();
-      renderApp();
-      syncCurrentUrl();
+      }, { merge: true }).then(async () => {
+        await loadAllSites();
+        if (siteSettingsDialog.open) siteSettingsDialog.close();
+        renderApp();
+        syncCurrentUrl();
+      });
     }
 
-    async function clearSiteKey() {
+    function clearSiteKey() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
       siteKeyInput.value = '';
@@ -1363,31 +1349,32 @@
       state.current.collaborative = false;
       state.current.updatedAt = Date.now();
 
-      await setDoc(doc(state.db, COLLECTION, state.current.siteId), {
+      setDoc(doc(state.db, COLLECTION, state.current.siteId), {
         key: '',
         collaborative: false,
         updatedAt: state.current.updatedAt
-      }, { merge: true });
-
-      await loadAllSites();
-      renderApp();
-      syncCurrentUrl();
+      }, { merge: true }).then(async () => {
+        await loadAllSites();
+        renderApp();
+        syncCurrentUrl();
+      });
     }
 
-    async function deleteCurrentSite() {
+    function deleteCurrentSite() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
       const ok = confirm('このサイトを削除しますか？');
       if (!ok) return;
 
-      await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
-      state.current = null;
-      state.currentSaved = false;
-      state.currentAccess = 'view';
-      location.hash = '';
-      state.mode = 'home';
-      await loadAllSites();
-      renderApp();
+      deleteDoc(doc(state.db, COLLECTION, state.current.siteId)).then(async () => {
+        state.current = null;
+        state.currentSaved = false;
+        state.currentAccess = 'view';
+        location.hash = '';
+        state.mode = 'home';
+        await loadAllSites();
+        renderApp();
+      });
     }
 
     function saveBlockSettings() {
@@ -1562,7 +1549,6 @@
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
-      longPressCandidateId = null;
     }
 
     function handleLongPressCandidate(blockId) {
@@ -1653,8 +1639,8 @@
         return;
       }
 
-      const editorBlock = target.closest('[data-editor-block]');
       const editorCard = target.closest('[data-editor-block-card]');
+      const editorBlock = target.closest('[data-editor-block]');
 
       if (state.mode === 'editor' && editorCard) {
         const blockId = editorCard.getAttribute('data-editor-block-card');
@@ -1908,10 +1894,6 @@
         return;
       }
 
-      if (target.id === 'blockRowsInput') {
-        return;
-      }
-
       const editorBlock = target.closest('[data-editor-block]');
       if (state.mode === 'editor' && editorBlock) {
         const blockId = editorBlock.getAttribute('data-editor-block');
@@ -1929,7 +1911,6 @@
       if (!blockId) return;
 
       clearLongPressTimer();
-      longPressCandidateId = blockId;
       longPressTimer = setTimeout(() => {
         handleLongPressCandidate(blockId);
       }, 500);
