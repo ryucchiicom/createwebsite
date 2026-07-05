@@ -24,7 +24,6 @@
       --danger:#ef4444;
       --shadow:0 18px 50px rgba(28,36,48,.12);
       --radius:22px;
-      --topbar-height:0px;
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
@@ -189,6 +188,10 @@
       opacity:.55;
       border-style:dashed;
     }
+    .block.move-source{
+      outline:2px dashed var(--brand);
+      outline-offset:2px;
+    }
 
     .block-head{
       display:flex;
@@ -196,6 +199,9 @@
       gap:8px;
       align-items:center;
       margin-bottom:8px;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
     }
 
     .rendered-text{
@@ -211,6 +217,21 @@
       display:block;
       -webkit-overflow-scrolling:touch;
     }
+
+    .editor-text{
+      min-height:44px;
+      outline:none;
+      white-space:pre-wrap;
+      line-height:1.8;
+      word-break:break-word;
+      max-width:100%;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
+      touch-action:manipulation;
+      padding:2px 0;
+    }
+    .editor-text:focus{outline:none}
 
     .rich-editor{
       min-height:180px;
@@ -235,7 +256,7 @@
       display:flex;
       gap:10px;
       align-items:center;
-      justify-content:space-between;
+      justify-content:center;
       padding:12px;
       background:var(--surface-soft);
       border:1px solid var(--line);
@@ -245,7 +266,6 @@
       pointer-events:auto;
       backdrop-filter: blur(10px);
     }
-    .bottom-add-bar span{color:var(--muted);font-weight:700;padding-left:12px}
 
     .home-gear-btn{
       position:fixed;
@@ -403,10 +423,6 @@
         align-items:stretch;
         flex-direction:column;
       }
-      .bottom-add-bar span{
-        padding-left:0;
-        text-align:center;
-      }
       .home-gear-btn{
         top:12px;
         right:12px;
@@ -436,7 +452,7 @@
   <dialog id="siteSettingsDialog">
     <div class="dialog-body">
       <h2>設定</h2>
-      <p>ここには今後、公開範囲やその他の機能を増やしていきます。</p>
+      <p>ここでは公開範囲や共同編集Keyをまとめて管理できます。</p>
 
       <div class="field">
         <label>
@@ -445,24 +461,19 @@
         </label>
       </div>
 
+      <div class="field">
+        <label for="siteKeyInput">共同編集Key</label>
+        <input id="siteKeyInput" placeholder="例：abc123" />
+      </div>
+
       <div class="toolbar">
+        <button class="btn" id="siteClearKeyBtn" type="button">Keyを消す</button>
+        <button class="btn danger" id="siteDeleteBtn" type="button">サイト削除</button>
+      </div>
+
+      <div class="toolbar" style="margin-top:14px">
         <button class="btn" id="siteSettingsCancelBtn" type="button">キャンセル</button>
         <button class="btn primary" id="siteSettingsSaveBtn" type="button">保存して閉じる</button>
-      </div>
-    </div>
-  </dialog>
-
-  <dialog id="blockDialog">
-    <div class="dialog-body">
-      <h2 id="blockDialogTitle">テキストブロック</h2>
-      <p>太字はPCなら Ctrl+B、スマホなら文字選択後の標準フォーマット機能で変更できます。色は <code>'#ff0000赤文字'</code> のように書けます。</p>
-      <div class="field">
-        <label for="blockInput">本文</label>
-        <div id="blockInput" class="rich-editor" contenteditable="true"></div>
-      </div>
-      <div class="toolbar">
-        <button class="btn" id="blockCancelBtn" type="button">キャンセル</button>
-        <button class="btn primary" id="blockSaveBtn" type="button">反映</button>
       </div>
     </div>
   </dialog>
@@ -563,6 +574,7 @@
       getDoc,
       setDoc,
       updateDoc,
+      deleteDoc,
       doc,
       arrayUnion
     } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
@@ -579,7 +591,6 @@
 
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
-    const RELOAD_KEY = 'createwebsite:bootReloadedOnce';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
 
     const appRoot = document.getElementById('app');
@@ -588,9 +599,9 @@
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
-    const blockDialog = document.getElementById('blockDialog');
-    const blockDialogTitle = document.getElementById('blockDialogTitle');
-    const blockInput = document.getElementById('blockInput');
+    const siteKeyInput = document.getElementById('siteKeyInput');
+    const siteDeleteBtn = document.getElementById('siteDeleteBtn');
+    const siteClearKeyBtn = document.getElementById('siteClearKeyBtn');
     const blockSettingsDialog = document.getElementById('blockSettingsDialog');
     const blockVisibleToggle = document.getElementById('blockVisibleToggle');
     const blockWrapToggle = document.getElementById('blockWrapToggle');
@@ -621,12 +632,13 @@
       editingBlockId: null,
       shareMode: 'view',
       authError: '',
-      loadingMessage: 'Firebase接続中…',
       pendingBlockSettingsId: null,
-      addBarOpacity: Number(localStorage.getItem(ADD_BAR_OPACITY_KEY) || '0.92')
+      addBarOpacity: Number(localStorage.getItem(ADD_BAR_OPACITY_KEY) || '0.92'),
+      moveBlockId: null
     };
 
-    let bootTimer = null;
+    let longPressTimer = null;
+    let longPressCandidateId = null;
 
     function uid8() {
       if (crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
@@ -642,6 +654,12 @@
         .replace(/'/g, '&#39;');
     }
 
+    function htmlToPlainText(html) {
+      const div = document.createElement('div');
+      div.innerHTML = String(html ?? '');
+      return div.innerText || div.textContent || '';
+    }
+
     function sanitizeRichHtml(value) {
       const template = document.createElement('template');
       template.innerHTML = String(value ?? '');
@@ -654,8 +672,10 @@
 
         if (node.tagName === 'SPAN') {
           const color = node.style.color;
+          const fontSize = node.style.fontSize;
           node.removeAttribute('style');
           if (color) node.style.color = color;
+          if (fontSize) node.style.fontSize = fontSize;
         } else {
           [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
         }
@@ -664,9 +684,76 @@
       return template.innerHTML;
     }
 
-    function renderFormattedBlock(html) {
-      const sanitized = sanitizeRichHtml(html);
-      return sanitized.replace(/'#([0-9a-fA-F]{6})(.*?)'/g, '<span style="color:#$1">$2</span>');
+    function parseStyledSource(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      let html = '';
+      let color = '';
+      let size = '';
+      let spanOpen = false;
+
+      const currentStyle = () => {
+        const styles = [];
+        if (color) styles.push(`color:${color}`);
+        if (size) styles.push(`font-size:${size}px`);
+        return styles.join(';');
+      };
+
+      const closeSpan = () => {
+        if (spanOpen) {
+          html += '</span>';
+          spanOpen = false;
+        }
+      };
+
+      const openSpan = () => {
+        const style = currentStyle();
+        if (!style) return;
+        html += `<span style="${style}">`;
+        spanOpen = true;
+      };
+
+      const reopen = () => {
+        closeSpan();
+        if (color || size) openSpan();
+      };
+
+      for (let i = 0; i < text.length;) {
+        const ch = text[i];
+
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
+        if (colorMatch) {
+          color = `#${colorMatch[1]}`;
+          reopen();
+          i += colorMatch[0].length;
+          continue;
+        }
+
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})(['’])/);
+        if (sizeMatch) {
+          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopen();
+          i += sizeMatch[0].length;
+          continue;
+        }
+
+        if (ch === "'" || ch === '’') {
+          closeSpan();
+          color = '';
+          size = '';
+          i += 1;
+          continue;
+        }
+
+        if (!spanOpen && (color || size)) openSpan();
+
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
+
+        i += 1;
+      }
+
+      closeSpan();
+      return html;
     }
 
     function getCookie(name) {
@@ -732,12 +819,29 @@
       state.addBarOpacity = clamped;
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(clamped));
       updateAddBarOpacityLabel();
+      if (state.mode === 'editor') renderApp();
     }
 
     function updateAddBarOpacityLabel() {
       const percent = Math.round((Number(state.addBarOpacity) || 0.92) * 100);
       addBarOpacityValue.textContent = `${percent}%`;
       addBarOpacityRange.value = String(Math.round((Number(state.addBarOpacity) || 0.92) * 100));
+    }
+
+    function normalizeBlock(block = {}) {
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+
+      return {
+        id: block.id || uid8(),
+        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
+        html,
+        visible: block.visible !== false,
+        wrap: block.wrap !== false,
+        heightEnabled: block.heightEnabled === true,
+        rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
+      };
     }
 
     function normalizeSite(siteId, data = {}) {
@@ -756,17 +860,6 @@
       };
     }
 
-    function normalizeBlock(block = {}) {
-      return {
-        id: block.id || uid8(),
-        html: String(block.html ?? ''),
-        visible: block.visible !== false,
-        wrap: block.wrap !== false,
-        heightEnabled: block.heightEnabled === true,
-        rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
-      };
-    }
-
     function blockHeightStyle(block) {
       if (!block.heightEnabled) return '';
       const rows = Math.max(1, Math.min(50, Number(block.rows || 3) || 3));
@@ -781,6 +874,10 @@
       return Boolean(site && Array.isArray(site.collaborators) && site.collaborators.includes(state.uid));
     }
 
+    function isCurrentCreator() {
+      return Boolean(state.current && state.current.creatorId === creatorId());
+    }
+
     function canEditCurrent() {
       const site = state.current;
       if (!site) return false;
@@ -792,10 +889,6 @@
       if (!state.currentSaved || !state.current) return '';
       const key = state.shareMode === 'edit' && state.current.key ? state.current.key : null;
       return siteUrl(state.current.siteId, key);
-    }
-
-    function homeStatusHtml() {
-      return '';
     }
 
     function siteSearchText(site) {
@@ -834,7 +927,7 @@
       history.replaceState(null, '', siteUrl(state.current.siteId, key));
     }
 
-    function renderLoading() {
+    function drawLoadingScreen() {
       const dots = '<span></span><span></span><span></span><span></span>';
       appRoot.innerHTML = `
         <div class="boot-wrap">
@@ -843,15 +936,15 @@
             <h1 style="font-size:clamp(2rem,5vw,3rem);margin-top:8px">Firebaseにつないでいます</h1>
             <div class="loader-line">
               <div class="loader" aria-hidden="true">${dots}</div>
-              <p style="margin:0">${esc(state.authError || state.loadingMessage)}</p>
+              <p style="margin:0">${esc(state.authError || '接続を待っています。')}</p>
             </div>
-            <p>5秒経っても終わらなければ自動で再読み込みします。もう一度だめならトップへ戻るボタンが出ます。</p>
+            <p>読み込みが終わるまで少し待ってね。失敗したら再読み込みできます。</p>
           </div>
         </div>
       `;
     }
 
-    function renderBootFailed() {
+    function drawBootErrorScreen() {
       appRoot.innerHTML = `
         <div class="boot-wrap">
           <div class="boot-card">
@@ -867,7 +960,7 @@
       `;
     }
 
-    function renderHome() {
+    function drawHomeScreen() {
       const mine = filterSites(mineSites(), state.homeSearch);
       const pub = filterSites(publicSites(), state.homeSearch);
       const list = state.homeTab === 'mine' ? mine : pub;
@@ -909,20 +1002,19 @@
               <input id="homeSearchInput" style="flex:1;min-width:220px" type="text" placeholder="検索" value="${esc(state.homeSearch)}">
               <button class="btn" id="homeRefreshBtn" type="button">↻</button>
             </div>
-            ${homeStatusHtml()}
             <div class="site-grid" id="siteList">${listHtml}</div>
           </div>
         </div>
       `;
     }
 
-    function renderViewer() {
+    function drawViewerScreen() {
       const site = state.current;
       const blocks = (site?.blocks || [])
         .filter((block) => block.visible !== false)
         .map((block) => `
           <article class="block" style="${blockHeightStyle(block)}">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${renderFormattedBlock(block.html || '')}</div>
+            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
           </article>
         `).join('');
 
@@ -948,27 +1040,22 @@
       `;
     }
 
-    function renderEditor() {
+    function drawEditorScreen() {
       const site = state.current;
+      const canShowSiteSettings = isCurrentCreator();
       const blocks = (site?.blocks || []).map((block, index) => {
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
+        const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const preview = normalized.visible
-          ? `<div class="rendered-text" style="${blockHeightStyle(normalized)}">${renderFormattedBlock(normalized.html || '')}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
-          <article class="block${hiddenClass}" data-block-id="${esc(normalized.id)}">
+          <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}">
             <div class="block-head">
               <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
-              <div class="toolbar">
-                <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
-                <button class="btn small" data-block-action="edit" data-block-id="${esc(normalized.id)}" type="button">編集</button>
-                <button class="btn small" data-block-action="copy" data-block-id="${esc(normalized.id)}" type="button">複製</button>
-                <button class="btn small" data-block-action="up" data-block-id="${esc(normalized.id)}" type="button">↑</button>
-                <button class="btn small" data-block-action="down" data-block-id="${esc(normalized.id)}" type="button">↓</button>
-                <button class="btn small danger" data-block-action="delete" data-block-id="${esc(normalized.id)}" type="button">削除</button>
-              </div>
+              <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
             </div>
             ${preview}
           </article>
@@ -984,7 +1071,7 @@
             <h2 id="editorHeading">${esc(site?.title || '無題のサイト')}</h2>
           </div>
           <div class="toolbar">
-            <button class="btn" id="siteSettingsBtn" type="button">⚙️ 設定</button>
+            ${canShowSiteSettings ? '<button class="btn" id="siteSettingsBtn" type="button">⚙️ 設定</button>' : ''}
             <button class="btn" id="shareBtn" type="button">共有</button>
             <button class="btn primary" id="saveBtn" type="button">保存</button>
           </div>
@@ -992,15 +1079,10 @@
 
         <div class="editor-layout">
           <section class="panel">
-            <h3>共同編集設定</h3>
-            <p class="notice">Keyがあるリンクを開くと、その人が共同編集者として追加されます。</p>
+            <h3>サイト</h3>
             <div class="field">
               <label for="titleInput">サイトタイトル</label>
               <input id="titleInput" placeholder="例：自己紹介" value="${esc(site?.title || '')}">
-            </div>
-            <div class="field">
-              <label for="editKeyInput">共同編集Key</label>
-              <input id="editKeyInput" placeholder="例：abc123" value="${esc(site?.key || '')}">
             </div>
           </section>
 
@@ -1013,13 +1095,12 @@
         </div>
 
         <div class="bottom-add-bar" id="bottomAddBar" style="background:${addBarBackground()};">
-          <span>下からブロックを追加できます</span>
           <button class="btn primary" id="addBlockBtn" type="button">＋ 追加</button>
         </div>
       `;
     }
 
-    function renderMissingScreen(message = 'このリンクのサイトは見つかりませんでした。') {
+    function drawMissingScreen(message = 'このリンクのサイトは見つかりませんでした。') {
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
@@ -1033,7 +1114,7 @@
       `;
     }
 
-    function renderDeniedScreen() {
+    function drawDeniedScreen() {
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
@@ -1047,14 +1128,14 @@
       `;
     }
 
-    function render() {
-      if (state.mode === 'loading') renderLoading();
-      else if (state.mode === 'home') renderHome();
-      else if (state.mode === 'viewer') renderViewer();
-      else if (state.mode === 'editor') renderEditor();
-      else if (state.mode === 'missing') renderMissingScreen();
-      else if (state.mode === 'denied') renderDeniedScreen();
-      else if (state.mode === 'boot-failed') renderBootFailed();
+    function renderApp() {
+      if (state.mode === 'loading') drawLoadingScreen();
+      else if (state.mode === 'home') drawHomeScreen();
+      else if (state.mode === 'viewer') drawViewerScreen();
+      else if (state.mode === 'editor') drawEditorScreen();
+      else if (state.mode === 'missing') drawMissingScreen();
+      else if (state.mode === 'denied') drawDeniedScreen();
+      else if (state.mode === 'boot-failed') drawBootErrorScreen();
     }
 
     function setCurrentSite(site, saved = true) {
@@ -1064,6 +1145,7 @@
       }
       state.currentSaved = !!saved;
       state.editingBlockId = null;
+      state.moveBlockId = null;
     }
 
     function createDraftSite() {
@@ -1075,7 +1157,7 @@
         creatorId: creatorId(),
         key: '',
         blocks: [
-          { id: uid8(), html: "こんにちは<br><strong>太字</strong><br>'#ff0000赤文字'", visible: true, wrap: true, heightEnabled: false, rows: 3 }
+          { id: uid8(), source: "こんにちは\n太字も使えるよ\n#ff0000'赤文字'", html: "こんにちは<br>太字も使えるよ<br><span style=\"color:#ff0000\">赤文字</span>", visible: true, wrap: true, heightEnabled: false, rows: 3 }
         ],
         isPublic: true,
         collaborative: false,
@@ -1088,74 +1170,79 @@
     function openNewDraft() {
       if (!state.ready) return;
       const draft = createDraftSite();
-      openEditor(draft, false, 'owner', false);
+      openEditorScreen(draft, false, 'owner', false);
       location.hash = '#/create';
     }
 
-    function openBlockDialog(blockId = null) {
+    function openEditorScreen(site, saved = true, access = 'view', sync = true) {
+      setCurrentSite(site, saved);
+      state.currentAccess = access;
+      state.mode = 'editor';
+      renderApp();
+      if (sync) syncCurrentUrl();
+      focusBlockByIdIfNeeded();
+    }
+
+    function openViewerScreen(site, access = 'view', sync = true) {
+      setCurrentSite(site, true);
+      state.currentAccess = access;
+      state.mode = 'viewer';
+      renderApp();
+      if (sync) syncCurrentUrl();
+    }
+
+    function focusBlockByIdIfNeeded() {
+      if (!state.editingBlockId) return;
+      const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(state.editingBlockId)}"]`);
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.focus?.();
+        placeCaretAtEnd(el);
+      });
+    }
+
+    function placeCaretAtEnd(el) {
+      if (!el) return;
+      const selection = window.getSelection();
+      if (!selection) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    function openBlockSettingsModal(blockId = null) {
       if (!state.current) return;
-      state.editingBlockId = blockId;
-      const block = blockId ? state.current.blocks.find((b) => b.id === blockId) : null;
-      blockDialogTitle.textContent = blockId ? 'テキストブロックを編集' : 'テキストブロックを追加';
-      blockInput.innerHTML = block?.html || '';
-      if (!blockDialog.open) blockDialog.showModal();
-      requestAnimationFrame(() => blockInput.focus());
+      state.pendingBlockSettingsId = blockId;
+      const target = blockId ? state.current.blocks.find((b) => b.id === blockId) : null;
+      if (!target) return;
+      blockVisibleToggle.checked = target.visible !== false;
+      blockWrapToggle.checked = target.wrap !== false;
+      blockHeightToggle.checked = target.heightEnabled === true;
+      blockRowsInput.value = String(Math.max(1, Math.min(50, Number(target.rows || 3) || 3)));
+      blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
+      if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
     }
 
-    function closeBlockDialog() {
-      if (blockDialog.open) blockDialog.close();
-      state.editingBlockId = null;
+    function openSiteSettingsModal() {
+      if (!state.current || !isCurrentCreator()) return;
+      sitePublicToggle.checked = state.current.isPublic !== false;
+      siteKeyInput.value = state.current.key || '';
+      siteDeleteBtn.classList.toggle('hidden', !isCurrentCreator());
+      siteClearKeyBtn.classList.toggle('hidden', !isCurrentCreator());
+      if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
-    function saveBlockDialog() {
-      if (!state.current) return;
-      const html = sanitizeRichHtml(blockInput.innerHTML.trim()) || '新しいテキスト';
-      if (state.editingBlockId) {
-        const target = state.current.blocks.find((b) => b.id === state.editingBlockId);
-        if (target) target.html = html;
-      } else {
-        state.current.blocks.push(normalizeBlock({ id: uid8(), html, visible: true, wrap: true, heightEnabled: false, rows: 3 }));
-      }
-      closeBlockDialog();
-      render();
+    function openHomeSettingsModal() {
+      updateAddBarOpacityLabel();
+      if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
-    async function loadAllSites() {
-      if (!state.db) return [];
-      const snapshot = await getDocs(collection(state.db, COLLECTION));
-      state.homeSites = snapshot.docs.map((d) => normalizeSite(d.id, d.data() || {}));
-      return state.homeSites;
-    }
-
-    async function loadSiteById(siteId) {
-      if (!state.db || !siteId) return null;
-      const snap = await getDoc(doc(state.db, COLLECTION, siteId));
-      if (!snap.exists()) return null;
-      const site = normalizeSite(snap.id, snap.data() || {});
-      site.blocks = (site.blocks || []).map(normalizeBlock);
-      return site;
-    }
-
-    function showMissingSite(message) {
-      state.current = {
-        siteId: 'missing',
-        title: 'サイトが見つかりません',
-        blocks: [{ id: 'missing', html: message || 'このリンクのサイトは見つかりませんでした。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
-      };
-      state.currentSaved = true;
-      state.mode = 'missing';
-      render();
-    }
-
-    function showDeniedSite() {
-      state.current = {
-        siteId: 'denied',
-        title: 'アクセスできません',
-        blocks: [{ id: 'denied', html: 'このサイトは非公開です。正しい閲覧リンクか共同編集Keyが必要です。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
-      };
-      state.currentSaved = true;
-      state.mode = 'denied';
-      render();
+    function openMergeModal() {
+      mergeTargetInput.value = '';
+      if (!mergeDialog.open) mergeDialog.showModal();
+      requestAnimationFrame(() => mergeTargetInput.focus());
     }
 
     function showShareModal() {
@@ -1203,45 +1290,107 @@
       }, 120);
     }
 
-    function openSiteSettingsModal() {
-      if (!state.current) return;
-      sitePublicToggle.checked = state.current.isPublic !== false;
-      if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
+    async function loadAllSites() {
+      if (!state.db) return [];
+      const snapshot = await getDocs(collection(state.db, COLLECTION));
+      state.homeSites = snapshot.docs.map((d) => normalizeSite(d.id, d.data() || {}));
+      return state.homeSites;
+    }
+
+    async function loadSiteById(siteId) {
+      if (!state.db || !siteId) return null;
+      const snap = await getDoc(doc(state.db, COLLECTION, siteId));
+      if (!snap.exists()) return null;
+      const site = normalizeSite(snap.id, snap.data() || {});
+      site.blocks = (site.blocks || []).map(normalizeBlock);
+      return site;
+    }
+
+    function showMissingSite(message) {
+      state.current = {
+        siteId: 'missing',
+        title: 'サイトが見つかりません',
+        blocks: [{ id: 'missing', source: '', html: message || 'このリンクのサイトは見つかりませんでした。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
+      };
+      state.currentSaved = true;
+      state.mode = 'missing';
+      renderApp();
+    }
+
+    function showDeniedSite() {
+      state.current = {
+        siteId: 'denied',
+        title: 'アクセスできません',
+        blocks: [{ id: 'denied', source: '', html: 'このサイトは非公開です。正しい閲覧リンクか共同編集Keyが必要です。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
+      };
+      state.currentSaved = true;
+      state.mode = 'denied';
+      renderApp();
+    }
+
+    async function saveHomeSettings() {
+      localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
+      if (homeSettingsDialog.open) homeSettingsDialog.close();
+      if (state.mode === 'editor') renderApp();
     }
 
     async function saveSiteSettings() {
-      if (!state.current || !state.db) return;
+      if (!state.current || !state.db || !isCurrentCreator()) return;
+
       state.current.isPublic = !!sitePublicToggle.checked;
+      state.current.key = String(siteKeyInput.value || '').trim();
+      state.current.collaborative = Boolean(state.current.key);
       state.current.updatedAt = Date.now();
 
       await setDoc(doc(state.db, COLLECTION, state.current.siteId), {
         isPublic: state.current.isPublic,
+        key: state.current.key,
+        collaborative: state.current.collaborative,
         updatedAt: state.current.updatedAt
       }, { merge: true });
 
       await loadAllSites();
-      render();
       if (siteSettingsDialog.open) siteSettingsDialog.close();
+      renderApp();
+      syncCurrentUrl();
     }
 
-    function openBlockSettingsModal(blockId) {
-      if (!state.current || !blockId) return;
-      const target = state.current.blocks.find((b) => b.id === blockId);
-      if (!target) return;
-      state.pendingBlockSettingsId = blockId;
-      blockVisibleToggle.checked = target.visible !== false;
-      blockWrapToggle.checked = target.wrap !== false;
-      blockHeightToggle.checked = target.heightEnabled === true;
-      blockRowsInput.value = String(Math.max(1, Math.min(50, Number(target.rows || 3) || 3)));
-      blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
-      if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
+    async function clearSiteKey() {
+      if (!state.current || !state.db || !isCurrentCreator()) return;
+
+      siteKeyInput.value = '';
+      state.current.key = '';
+      state.current.collaborative = false;
+      state.current.updatedAt = Date.now();
+
+      await setDoc(doc(state.db, COLLECTION, state.current.siteId), {
+        key: '',
+        collaborative: false,
+        updatedAt: state.current.updatedAt
+      }, { merge: true });
+
+      await loadAllSites();
+      renderApp();
+      syncCurrentUrl();
     }
 
-    function syncBlockRowsVisibility() {
-      blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
+    async function deleteCurrentSite() {
+      if (!state.current || !state.db || !isCurrentCreator()) return;
+
+      const ok = confirm('このサイトを削除しますか？');
+      if (!ok) return;
+
+      await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
+      state.current = null;
+      state.currentSaved = false;
+      state.currentAccess = 'view';
+      location.hash = '';
+      state.mode = 'home';
+      await loadAllSites();
+      renderApp();
     }
 
-    async function saveBlockSettings() {
+    function saveBlockSettings() {
       if (!state.current || !state.db || !state.pendingBlockSettingsId) return;
       const target = state.current.blocks.find((b) => b.id === state.pendingBlockSettingsId);
       if (!target) return;
@@ -1252,21 +1401,23 @@
       target.rows = target.heightEnabled ? Math.max(1, Math.min(50, Number(blockRowsInput.value || 3) || 3)) : (target.rows || 3);
       state.current.updatedAt = Date.now();
 
-      await setDoc(doc(state.db, COLLECTION, state.current.siteId), {
-        blocks: state.current.blocks.map(normalizeBlock),
+      setDoc(doc(state.db, COLLECTION, state.current.siteId), {
+        blocks: state.current.blocks.map((b) => ({
+          id: b.id,
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
+          visible: b.visible !== false,
+          wrap: b.wrap !== false,
+          heightEnabled: b.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+        })),
         updatedAt: state.current.updatedAt
-      }, { merge: true });
-
-      await loadAllSites();
-      render();
-      if (blockSettingsDialog.open) blockSettingsDialog.close();
-      state.pendingBlockSettingsId = null;
-    }
-
-    function openMergeModal() {
-      mergeTargetInput.value = '';
-      if (!mergeDialog.open) mergeDialog.showModal();
-      requestAnimationFrame(() => mergeTargetInput.focus());
+      }, { merge: true }).then(async () => {
+        await loadAllSites();
+        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        state.pendingBlockSettingsId = null;
+        renderApp();
+      });
     }
 
     async function executeIdMerge() {
@@ -1293,7 +1444,7 @@
       if (!matches.length) {
         setCreatorId(target);
         await loadAllSites();
-        render();
+        renderApp();
         if (mergeDialog.open) mergeDialog.close();
         return;
       }
@@ -1309,7 +1460,7 @@
       }
 
       await loadAllSites();
-      render();
+      renderApp();
       if (mergeDialog.open) mergeDialog.close();
       alert('IDを統合しました。');
     }
@@ -1321,13 +1472,9 @@
       }
 
       const titleInput = document.getElementById('titleInput');
-      const keyInput = document.getElementById('editKeyInput');
       const title = String(titleInput?.value || '').trim() || '無題のサイト';
-      const key = String(keyInput?.value || '').trim();
 
       state.current.title = title;
-      state.current.key = key;
-      state.current.collaborative = Boolean(key);
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
       state.current.creatorId = state.current.creatorId || creatorId();
@@ -1335,7 +1482,15 @@
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks,
+        blocks: state.current.blocks.map((b) => ({
+          id: b.id,
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
+          visible: b.visible !== false,
+          wrap: b.wrap !== false,
+          heightEnabled: b.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+        })),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1347,7 +1502,7 @@
       state.current.blocks = state.current.blocks.map(normalizeBlock);
       await loadAllSites();
       state.mode = 'editor';
-      render();
+      renderApp();
       syncCurrentUrl();
       alert('保存しました。');
     }
@@ -1392,85 +1547,89 @@
       }
 
       state.mode = 'viewer';
-      render();
+      renderApp();
       if (sync) syncCurrentUrl();
     }
 
-    async function refreshHomeSites() {
-      await loadAllSites();
-      if (state.mode === 'home') render();
+    function reloadHomeSites() {
+      loadAllSites().then(() => {
+        if (state.mode === 'home') renderApp();
+      });
     }
 
-    function clearBootTimer() {
-      if (bootTimer) {
-        clearTimeout(bootTimer);
-        bootTimer = null;
+    function clearLongPressTimer() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
       }
+      longPressCandidateId = null;
     }
 
-    function startBootTimer() {
-      clearBootTimer();
-      bootTimer = setTimeout(() => {
-        if (state.ready) return;
-        const alreadyReloaded = sessionStorage.getItem(RELOAD_KEY) === '1';
-        if (!alreadyReloaded) {
-          sessionStorage.setItem(RELOAD_KEY, '1');
-          location.reload();
-          return;
-        }
-        state.mode = 'boot-failed';
-        render();
-      }, 5000);
+    function handleLongPressCandidate(blockId) {
+      if (!blockId || !state.current || state.mode !== 'editor') return;
+      if (state.moveBlockId === blockId) return;
+      state.moveBlockId = blockId;
+      renderApp();
     }
 
-    async function initFirebase() {
-      if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
-        state.ready = false;
-        state.authError = 'Firebase設定がありません。firebaseConfig を入れてください。';
-        state.mode = 'boot-failed';
-        render();
-        return;
-      }
+    function moveBlockBefore(fromId, toId) {
+      if (!state.current || fromId === toId) return;
+      const fromIndex = state.current.blocks.findIndex((b) => b.id === fromId);
+      const toIndex = state.current.blocks.findIndex((b) => b.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return;
 
-      try {
-        const app = initializeApp(firebaseConfig);
-        state.db = getFirestore(app);
-        const auth = getAuth(app);
+      const [item] = state.current.blocks.splice(fromIndex, 1);
+      const adjustedToIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      state.current.blocks.splice(adjustedToIndex, 0, item);
+      state.currentSaved = false;
+      state.moveBlockId = null;
+      renderApp();
+    }
 
-        const cred = await signInAnonymously(auth);
-        state.uid = cred.user?.uid || auth.currentUser?.uid || '';
-        state.ready = true;
-        state.authError = '';
-        sessionStorage.removeItem(RELOAD_KEY);
-        clearBootTimer();
+    function focusBlockEditor(blockId) {
+      requestAnimationFrame(() => {
+        const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(blockId)}"]`);
+        if (!el) return;
+        el.focus?.();
+        placeCaretAtEnd(el);
+      });
+    }
 
-        await loadAllSites();
+    function addNewBlock() {
+      if (!state.current) return;
+      const block = normalizeBlock({
+        id: uid8(),
+        source: '',
+        html: '',
+        visible: true,
+        wrap: true,
+        heightEnabled: false,
+        rows: 3
+      });
+      state.current.blocks.push(block);
+      state.currentSaved = false;
+      renderApp();
+      state.editingBlockId = block.id;
+      focusBlockEditor(block.id);
+    }
 
-        const route = parseRoute();
-        if (route.name === 'site') {
-          await openSiteById(route.siteId, route.key || null, false);
-        } else if (route.name === 'create') {
-          openNewDraft();
-        } else {
-          state.mode = 'home';
-          render();
-        }
-      } catch (error) {
-        console.error(error);
-        const code = error?.code || '';
-        if (code === 'auth/configuration-not-found') {
-          state.authError = 'Firebase Authentication の匿名ログインが未設定か、Auth 側の設定が足りません。';
-        } else if (code === 'auth/operation-not-allowed') {
-          state.authError = 'Firebase Authentication の匿名ログインが無効です。Auth で Anonymous を有効にしてください。';
-        } else if (code === 'auth/network-request-failed') {
-          state.authError = 'ネットワークに接続できません。通信許可とブラウザ設定を確認してください。';
-        } else {
-          state.authError = `Firebase接続に失敗しました。${code ? `(${code})` : ''}`;
-        }
-        state.ready = false;
-        state.mode = 'boot-failed';
-        clearBootTimer();
-        render();
+    function updateEditableBlockFromDom(blockId, element) {
+      if (!state.current || !blockId || !element) return;
+      const idx = state.current.blocks.findIndex((b) => b.id === blockId);
+      if (idx < 0) return;
+
+      const raw = element.innerText.replace(/\r/g, '');
+      const html = parseStyledSource(raw);
+
+      state.current.blocks[idx].source = raw;
+      state.current.blocks[idx].html = html || '<br>';
+      state.currentSaved = false;
+
+      const selectionKeep = document.activeElement === element;
+      const nextHtml = html || '<br>';
+      if (element.innerHTML !== nextHtml) {
+        element.innerHTML = nextHtml;
+        if (selectionKeep) placeCaretAtEnd(element);
       }
     }
 
@@ -1488,31 +1647,32 @@
         const blockId = blockActionBtn.getAttribute('data-block-id');
         if (!state.current || !blockId) return;
 
-        const index = state.current.blocks.findIndex((b) => b.id === blockId);
-        if (index < 0) return;
-
-        if (action === 'edit') {
-          openBlockDialog(blockId);
-        } else if (action === 'settings') {
+        if (action === 'settings') {
           openBlockSettingsModal(blockId);
-        } else if (action === 'copy') {
-          state.current.blocks.splice(index + 1, 0, { ...structuredClone(state.current.blocks[index]), id: uid8() });
-          render();
-        } else if (action === 'delete') {
-          if (confirm('このブロックを削除しますか？')) {
-            state.current.blocks.splice(index, 1);
-            render();
-          }
-        } else if (action === 'up' && index > 0) {
-          const [item] = state.current.blocks.splice(index, 1);
-          state.current.blocks.splice(index - 1, 0, item);
-          render();
-        } else if (action === 'down' && index < state.current.blocks.length - 1) {
-          const [item] = state.current.blocks.splice(index, 1);
-          state.current.blocks.splice(index + 1, 0, item);
-          render();
         }
         return;
+      }
+
+      const editorBlock = target.closest('[data-editor-block]');
+      const editorCard = target.closest('[data-editor-block-card]');
+
+      if (state.mode === 'editor' && editorCard) {
+        const blockId = editorCard.getAttribute('data-editor-block-card');
+
+        if (state.moveBlockId) {
+          if (state.moveBlockId === blockId) {
+            state.moveBlockId = null;
+            renderApp();
+            return;
+          }
+          moveBlockBefore(state.moveBlockId, blockId);
+          return;
+        }
+
+        if (editorBlock) {
+          editorBlock.focus?.();
+          return;
+        }
       }
 
       if (target.closest('#newSiteBtn')) {
@@ -1527,8 +1687,7 @@
       }
 
       if (target.closest('#homeSettingsBtn')) {
-        updateAddBarOpacityLabel();
-        if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
+        openHomeSettingsModal();
         return;
       }
 
@@ -1539,15 +1698,15 @@
         state.current = null;
         state.currentSaved = false;
         state.currentAccess = 'view';
+        state.moveBlockId = null;
         location.hash = '';
         state.mode = 'home';
-        render();
-        refreshHomeSites();
+        renderApp();
+        reloadHomeSites();
         return;
       }
 
       if (target.closest('#bootRetryBtn')) {
-        sessionStorage.setItem(RELOAD_KEY, '1');
         location.reload();
         return;
       }
@@ -1556,7 +1715,7 @@
         if (!state.current) return;
         if (canEditCurrent()) {
           state.mode = 'editor';
-          render();
+          renderApp();
           syncCurrentUrl();
         } else {
           const entered = prompt('Key を入力して編集', '');
@@ -1564,7 +1723,7 @@
           if ((entered || '').trim() === (state.current.key || '')) {
             state.currentAccess = 'key';
             state.mode = 'editor';
-            render();
+            renderApp();
             syncCurrentUrl();
           } else {
             alert('Key が違うよ');
@@ -1574,8 +1733,8 @@
       }
 
       if (target.closest('#siteSettingsBtn')) {
-        if (!canEditCurrent()) {
-          alert('編集できる人だけ設定できます。');
+        if (!canEditCurrent() || !isCurrentCreator()) {
+          alert('作成者だけが設定できます。');
           return;
         }
         openSiteSettingsModal();
@@ -1593,17 +1752,7 @@
       }
 
       if (target.closest('#addBlockBtn')) {
-        openBlockDialog();
-        return;
-      }
-
-      if (target.closest('#blockCancelBtn')) {
-        closeBlockDialog();
-        return;
-      }
-
-      if (target.closest('#blockSaveBtn')) {
-        saveBlockDialog();
+        addNewBlock();
         return;
       }
 
@@ -1614,6 +1763,16 @@
 
       if (target.closest('#siteSettingsSaveBtn')) {
         saveSiteSettings();
+        return;
+      }
+
+      if (target.closest('#siteClearKeyBtn')) {
+        clearSiteKey();
+        return;
+      }
+
+      if (target.closest('#siteDeleteBtn')) {
+        deleteCurrentSite();
         return;
       }
 
@@ -1690,7 +1849,7 @@
       const tabBtn = target.closest('[data-home-tab]');
       if (tabBtn) {
         state.homeTab = tabBtn.getAttribute('data-home-tab') || 'mine';
-        render();
+        renderApp();
         return;
       }
 
@@ -1704,18 +1863,22 @@
       }
 
       if (target.closest('#homeRefreshBtn')) {
-        refreshHomeSites();
+        reloadHomeSites();
       }
     }
 
-    document.addEventListener('click', (event) => handleClick(event.target));
-    document.addEventListener('input', (event) => {
+    function handleInput(event) {
       const target = event.target;
       if (!target) return;
 
       if (target.id === 'homeSearchInput') {
         state.homeSearch = target.value;
-        render();
+        renderApp();
+        return;
+      }
+
+      if (target.id === 'addBarOpacityRange') {
+        persistAddBarOpacity(Number(target.value) / 100);
         return;
       }
 
@@ -1723,32 +1886,77 @@
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
         if (heading) heading.textContent = target.value || '無題のサイト';
+        state.currentSaved = false;
         return;
       }
 
-      if (target.id === 'editKeyInput' && state.current) {
+      if (target.id === 'sitePublicToggle' && state.current) {
+        state.current.isPublic = !!target.checked;
+        state.currentSaved = false;
+        return;
+      }
+
+      if (target.id === 'siteKeyInput' && state.current) {
         state.current.key = target.value;
         state.current.collaborative = Boolean(String(target.value || '').trim());
-        return;
-      }
-
-      if (target.id === 'addBarOpacityRange') {
-        persistAddBarOpacity(Number(target.value) / 100);
-        if (state.mode === 'editor') {
-          const addBar = document.getElementById('bottomAddBar');
-          if (addBar) addBar.style.background = addBarBackground();
-        }
+        state.currentSaved = false;
         return;
       }
 
       if (target.id === 'blockHeightToggle') {
-        syncBlockRowsVisibility();
+        blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
         return;
+      }
+
+      if (target.id === 'blockRowsInput') {
+        return;
+      }
+
+      const editorBlock = target.closest('[data-editor-block]');
+      if (state.mode === 'editor' && editorBlock) {
+        const blockId = editorBlock.getAttribute('data-editor-block');
+        updateEditableBlockFromDom(blockId, editorBlock);
+      }
+    }
+
+    function handlePointerDown(event) {
+      if (state.mode !== 'editor') return;
+      const card = event.target.closest('[data-editor-block-card]');
+      if (!card) return;
+      if (event.target.closest('[data-block-action]')) return;
+
+      const blockId = card.getAttribute('data-editor-block-card');
+      if (!blockId) return;
+
+      clearLongPressTimer();
+      longPressCandidateId = blockId;
+      longPressTimer = setTimeout(() => {
+        handleLongPressCandidate(blockId);
+      }, 500);
+    }
+
+    function handlePointerUp() {
+      clearLongPressTimer();
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && state.moveBlockId) {
+        state.moveBlockId = null;
+        renderApp();
+      }
+    }
+
+    blockSettingsDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        state.pendingBlockSettingsId = null;
       }
     });
 
-    blockDialog.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeBlockDialog();
+    homeSettingsDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (homeSettingsDialog.open) homeSettingsDialog.close();
+      }
     });
 
     window.addEventListener('hashchange', async () => {
@@ -1759,8 +1967,9 @@
         state.current = null;
         state.currentSaved = false;
         state.currentAccess = 'view';
+        state.moveBlockId = null;
         state.mode = 'home';
-        render();
+        renderApp();
         return;
       }
 
@@ -1774,12 +1983,66 @@
       }
     });
 
-    async function bootstrap() {
-      state.mode = 'loading';
+    async function initFirebase() {
+      if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+        state.ready = false;
+        state.authError = 'Firebase設定がありません。firebaseConfig を入れてください。';
+        state.mode = 'boot-failed';
+        renderApp();
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const cred = await signInAnonymously(auth);
+        state.uid = cred.user?.uid || auth.currentUser?.uid || '';
+        state.ready = true;
+        state.authError = '';
+
+        await loadAllSites();
+
+        const route = parseRoute();
+        if (route.name === 'site') {
+          await openSiteById(route.siteId, route.key || null, false);
+        } else if (route.name === 'create') {
+          openNewDraft();
+        } else {
+          state.mode = 'home';
+          renderApp();
+        }
+      } catch (error) {
+        console.error(error);
+        const code = error?.code || '';
+        if (code === 'auth/configuration-not-found') {
+          state.authError = 'Firebase Authentication の匿名ログインが未設定か、Auth 側の設定が足りません。';
+        } else if (code === 'auth/operation-not-allowed') {
+          state.authError = 'Firebase Authentication の匿名ログインが無効です。Auth で Anonymous を有効にしてください。';
+        } else if (code === 'auth/network-request-failed') {
+          state.authError = 'ネットワークに接続できません。通信許可とブラウザ設定を確認してください。';
+        } else {
+          state.authError = `Firebase接続に失敗しました。${code ? `(${code})` : ''}`;
+        }
+        state.ready = false;
+        state.mode = 'boot-failed';
+        renderApp();
+      }
+    }
+
+    document.addEventListener('click', (event) => handleClick(event.target));
+    document.addEventListener('input', handleInput);
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('keydown', handleKeyDown);
+
+    function bootstrap() {
       updateAddBarOpacityLabel();
-      render();
-      startBootTimer();
-      await initFirebase();
+      state.mode = 'loading';
+      renderApp();
+      initFirebase();
     }
 
     bootstrap();
