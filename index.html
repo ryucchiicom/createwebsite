@@ -449,7 +449,7 @@
 
       <div class="field">
         <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
-        <input id="addBarOpacityRange" type="range" min="20" max="100" step="1" />
+        <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
       </div>
 
       <div class="toolbar">
@@ -818,21 +818,33 @@
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
+    function opacityToAlpha(value) {
+      const opacity = Math.max(0, Math.min(1, Number(value) || 0));
+      return Math.pow(opacity, 2.35);
+    }
+
     function addBarBackground() {
-      const alpha = Math.max(0.2, Math.min(1, Number(state.addBarOpacity) || 0.92));
+      const alpha = opacityToAlpha(state.addBarOpacity);
       return isDarkMode() ? `rgba(17,24,39,${alpha})` : `rgba(255,255,255,${alpha})`;
     }
 
     function addBlockButtonStyle() {
-      const alpha = Math.max(0.2, Math.min(1, Number(state.addBarOpacity) || 0.92));
+      const alpha = opacityToAlpha(state.addBarOpacity);
+      const lineAlpha = Math.max(0, alpha * 0.55);
+      const shadowAlpha = Math.max(0, alpha * 0.22);
+      const blur = alpha > 0.02 ? 'blur(10px)' : 'none';
+
       if (isDarkMode()) {
-        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
+        const shadow = alpha > 0.02 ? `0 18px 50px rgba(0,0,0,${shadowAlpha})` : 'none';
+        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,${lineAlpha});backdrop-filter:${blur};box-shadow:${shadow};`;
       }
-      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
+
+      const shadow = alpha > 0.02 ? `0 18px 50px rgba(28,36,48,${shadowAlpha})` : 'none';
+      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,${lineAlpha});backdrop-filter:${blur};box-shadow:${shadow};`;
     }
 
     function persistAddBarOpacity(value) {
-      const clamped = Math.max(0.2, Math.min(1, Number(value) || 0.92));
+      const clamped = Math.max(0, Math.min(1, Number(value) || 0));
       state.addBarOpacity = clamped;
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(clamped));
       updateAddBarOpacityLabel();
@@ -840,9 +852,9 @@
     }
 
     function updateAddBarOpacityLabel() {
-      const percent = Math.round((Number(state.addBarOpacity) || 0.92) * 100);
+      const percent = Math.round((Number(state.addBarOpacity) || 0) * 100);
       addBarOpacityValue.textContent = `${percent}%`;
-      addBarOpacityRange.value = String(Math.round((Number(state.addBarOpacity) || 0.92) * 100));
+      addBarOpacityRange.value = String(Math.round((Number(state.addBarOpacity) || 0) * 100));
     }
 
     function normalizeBlock(block = {}) {
