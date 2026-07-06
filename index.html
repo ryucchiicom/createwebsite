@@ -252,7 +252,7 @@
       left:50%;
       bottom:14px;
       transform:translateX(-50%);
-      width:min(760px, calc(100% - 28px));
+      width:min(720px, calc(100% - 48px));
       display:flex;
       gap:10px;
       align-items:center;
@@ -274,6 +274,10 @@
       font-weight:800;
       backdrop-filter:blur(10px);
       box-shadow:var(--shadow);
+      width:min(680px, calc(100% - 64px));
+      display:block;
+      margin:0 auto;
+      text-align:center;
     }
 
     .home-gear-btn{
@@ -429,7 +433,7 @@
       .toolbar .btn{flex:1}
       .bottom-add-bar{
         border-radius:24px;
-        align-items:stretch;
+        align-items:center;
         flex-direction:column;
       }
       .home-gear-btn{
@@ -642,7 +646,7 @@
       shareMode: 'view',
       authError: '',
       pendingBlockSettingsId: null,
-      addBarOpacity: Number(localStorage.getItem(ADD_BAR_OPACITY_KEY) || '0.92'),
+      addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
       moveBlockId: null
     };
 
@@ -818,33 +822,21 @@
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
-    function opacityToAlpha(value) {
-      const opacity = Math.max(0, Math.min(1, Number(value) || 0));
-      return Math.pow(opacity, 2.35);
-    }
-
     function addBarBackground() {
-      const alpha = opacityToAlpha(state.addBarOpacity);
+      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
       return isDarkMode() ? `rgba(17,24,39,${alpha})` : `rgba(255,255,255,${alpha})`;
     }
 
     function addBlockButtonStyle() {
-      const alpha = opacityToAlpha(state.addBarOpacity);
-      const lineAlpha = Math.max(0, alpha * 0.55);
-      const shadowAlpha = Math.max(0, alpha * 0.22);
-      const blur = alpha > 0.02 ? 'blur(10px)' : 'none';
-
+      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
       if (isDarkMode()) {
-        const shadow = alpha > 0.02 ? `0 18px 50px rgba(0,0,0,${shadowAlpha})` : 'none';
-        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,${lineAlpha});backdrop-filter:${blur};box-shadow:${shadow};`;
+        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
       }
-
-      const shadow = alpha > 0.02 ? `0 18px 50px rgba(28,36,48,${shadowAlpha})` : 'none';
-      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,${lineAlpha});backdrop-filter:${blur};box-shadow:${shadow};`;
+      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
     }
 
     function persistAddBarOpacity(value) {
-      const clamped = Math.max(0, Math.min(1, Number(value) || 0));
+      const clamped = Math.max(0, Math.min(1, Number.isFinite(Number(value)) ? Number(value) : 0.92));
       state.addBarOpacity = clamped;
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(clamped));
       updateAddBarOpacityLabel();
@@ -852,9 +844,10 @@
     }
 
     function updateAddBarOpacityLabel() {
-      const percent = Math.round((Number(state.addBarOpacity) || 0) * 100);
+      const current = Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92;
+      const percent = Math.round(current * 100);
       addBarOpacityValue.textContent = `${percent}%`;
-      addBarOpacityRange.value = String(Math.round((Number(state.addBarOpacity) || 0) * 100));
+      addBarOpacityRange.value = String(percent);
     }
 
     function normalizeBlock(block = {}) {
