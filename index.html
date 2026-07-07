@@ -712,6 +712,19 @@
       return null;
     }
 
+    function getStyleCommandPrefix(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const match = text.match(/^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})|S(\d{1,3}))(['’])(.*)$/);
+      if (!match) return null;
+      return {
+        type: match[2] ? 'color' : 'size',
+        value: match[2]
+          ? `#${match[2]}`
+          : String(Math.max(1, Math.min(256, Number(match[3]) || 16))),
+        tail: match[5] || ''
+      };
+    }
+
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
       if (command.type === 'color') {
@@ -721,13 +734,6 @@
         return `<span style="font-size:${esc(command.value)}px">'</span>`;
       }
       return '';
-    }
-
-    function normalizeTypedStyleCommands(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      return text
-        .replace(/(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))['’](?=[\s\S])/g, '$1')
-        .replace(/(S\d{1,3})['’](?=[\s\S])/g, '$1');
     }
 
     function parseStyledSource(input) {
@@ -1677,11 +1683,11 @@
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const normalizedRaw = normalizeTypedStyleCommands(raw);
-      const command = getStandaloneStyleCommand(normalizedRaw);
-      const html = command ? renderStandaloneStyleCommand(command) : parseStyledSource(normalizedRaw);
+      const command = getStandaloneStyleCommand(raw);
+      const prefix = getStyleCommandPrefix(raw);
+      const html = command ? renderStandaloneStyleCommand(command) : parseStyledSource(raw);
 
-      state.current.blocks[idx].source = normalizedRaw;
+      state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
       state.currentSaved = false;
 
@@ -1692,7 +1698,7 @@
         if (selectionKeep) placeCaretAtEnd(element);
       }
 
-      if (command) {
+      if (command || (prefix && prefix.tail)) {
         state.editingBlockId = null;
         requestAnimationFrame(() => {
           if (document.activeElement === element) element.blur();
