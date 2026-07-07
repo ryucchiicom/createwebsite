@@ -697,37 +697,8 @@
       return template.innerHTML;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])$/);
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
-
-      const sizeMatch = text.match(/^S(\d{1,3})(['’])$/);
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
-    }
-
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">'</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">'</span>`;
-      }
-      return '';
-    }
-
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const standalone = getStandaloneStyleCommand(text);
-      if (standalone) return renderStandaloneStyleCommand(standalone);
-
       let html = '';
       let color = '';
       let size = '';
