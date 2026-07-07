@@ -1669,12 +1669,31 @@
       const idx = state.current.blocks.findIndex((b) => b.id === blockId);
       if (idx < 0) return;
 
+      const previousSource = String(state.current.blocks[idx].source || '');
       const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw);
+      const command = getStandaloneStyleCommand(raw);
+      const keptCommand = !command && (raw === "'" || raw === '’') ? getStandaloneStyleCommand(previousSource) : null;
+      const activeCommand = command || keptCommand;
+      const source = command ? raw : (keptCommand ? previousSource : raw);
+      const html = activeCommand ? renderStandaloneStyleCommand(activeCommand) : parseStyledSource(raw);
 
-      state.current.blocks[idx].source = raw;
+      state.current.blocks[idx].source = source;
       state.current.blocks[idx].html = html || '<br>';
       state.currentSaved = false;
+
+      const selectionKeep = document.activeElement === element;
+      const nextHtml = html || '<br>';
+      if (element.innerHTML !== nextHtml) {
+        element.innerHTML = nextHtml;
+        if (selectionKeep) placeCaretAtEnd(element);
+      }
+
+      if (activeCommand) {
+        state.editingBlockId = null;
+        requestAnimationFrame(() => {
+          if (document.activeElement === element) element.blur();
+        });
+      }
     }
 
     function handleClick(target) {
