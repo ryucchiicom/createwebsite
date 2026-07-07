@@ -697,58 +697,76 @@
       return template.innerHTML;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])$/);
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
-
-      const sizeMatch = text.match(/^S(\d{1,3})(['’])$/);
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
-    }
-
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">'</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">'</span>`;
-      }
-      return '';
-    }
-
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
 
       let html = '';
+      let color = '';
+      let size = '';
+      let spanOpen = false;
+
+      const currentStyle = () => {
+        const styles = [];
+        if (color) styles.push(`color:${color}`);
+        if (size) styles.push(`font-size:${size}px`);
+        return styles.join(';');
+      };
+
+      const closeSpan = () => {
+        if (spanOpen) {
+          html += '</span>';
+          spanOpen = false;
+        }
+      };
+
+      const openSpan = () => {
+        const style = currentStyle();
+        if (!style) return;
+        html += `<span style="${style}">`;
+        spanOpen = true;
+      };
+
+      const reopen = () => {
+        closeSpan();
+        if (color || size) openSpan();
+      };
+
       for (let i = 0; i < text.length;) {
+        const ch = text[i];
+
         const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(['’])/);
         if (colorMatch) {
-          html += `<span style="color:#${colorMatch[1]}">'</span>`;
+          color = `#${colorMatch[1]}`;
+          reopen();
           i += colorMatch[0].length;
           continue;
         }
 
         const sizeMatch = text.slice(i).match(/^S(\d{1,3})(['’])/);
         if (sizeMatch) {
-          const size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          html += `<span style="font-size:${size}px">'</span>`;
+          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopen();
           i += sizeMatch[0].length;
           continue;
         }
 
-        const ch = text[i];
+        if (ch === "'" || ch === '’') {
+          closeSpan();
+          color = '';
+          size = '';
+          i += 1;
+          continue;
+        }
+
+        if (!spanOpen && (color || size)) openSpan();
+
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
+
         i += 1;
       }
 
+      closeSpan();
       return html;
     }
 
@@ -1053,7 +1071,7 @@
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="plaintext-only" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1624,8 +1642,7 @@
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const command = getStandaloneStyleCommand(raw);
-      const html = command ? renderStandaloneStyleCommand(command) : parseStyledSource(raw);
+      const html = parseStyledSource(raw);
 
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
@@ -1636,14 +1653,6 @@
       if (element.innerHTML !== nextHtml) {
         element.innerHTML = nextHtml;
         if (selectionKeep) placeCaretAtEnd(element);
-      }
-
-      if (command) {
-        state.editingBlockId = null;
-        element.blur();
-        requestAnimationFrame(() => {
-          if (document.activeElement === element) element.blur();
-        });
       }
     }
 
