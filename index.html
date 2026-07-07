@@ -1670,26 +1670,11 @@
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const command = getStandaloneStyleCommand(raw);
-      const html = command ? renderStandaloneStyleCommand(command) : parseStyledSource(raw);
+      const html = parseStyledSource(raw);
 
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
       state.currentSaved = false;
-
-      const selectionKeep = document.activeElement === element;
-      const nextHtml = html || '<br>';
-      if (element.innerHTML !== nextHtml) {
-        element.innerHTML = nextHtml;
-        if (selectionKeep) placeCaretAtEnd(element);
-      }
-
-      if (command) {
-        state.editingBlockId = null;
-        requestAnimationFrame(() => {
-          if (document.activeElement === element) element.blur();
-        });
-      }
     }
 
     function handleClick(target) {
