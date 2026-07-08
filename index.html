@@ -233,6 +233,73 @@
     }
     .editor-text:focus{outline:none}
 
+    .editor-source{
+      width:100%;
+      min-height:180px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 14px;
+      background:var(--surface);
+      color:var(--ink);
+      line-height:1.8;
+      resize:vertical;
+      outline:none;
+      font:inherit;
+    }
+    .editor-source:focus{
+      border-color:var(--brand);
+      box-shadow:0 0 0 4px rgba(95,99,242,.12);
+    }
+
+    .file-block{
+      display:grid;
+      gap:10px;
+      cursor:pointer;
+    }
+    .file-block-body{
+      display:grid;
+      gap:10px;
+      padding:14px;
+      border-radius:16px;
+      background:var(--surface-muted);
+      border:1px solid var(--line);
+      overflow:hidden;
+    }
+    .file-preview-shell{
+      display:grid;
+      gap:10px;
+    }
+    .file-preview-html,
+    .file-preview-text{
+      width:100%;
+      max-width:100%;
+      line-height:1.8;
+      word-break:break-word;
+      white-space:pre-wrap;
+    }
+    .file-preview-media{
+      width:100%;
+      max-height:60vh;
+      object-fit:contain;
+      border-radius:14px;
+      display:block;
+      background:var(--surface-muted);
+    }
+    .file-preview-frame{
+      width:100%;
+      height:min(70vh, 680px);
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--surface);
+    }
+    .file-ref{
+      color:var(--brand);
+      font-weight:800;
+      text-decoration:underline;
+      text-underline-offset:2px;
+      word-break:break-word;
+    }
+
     .rich-editor{
       min-height:180px;
       border:1px solid var(--line);
@@ -494,7 +561,7 @@
   <dialog id="blockSettingsDialog">
     <div class="dialog-body">
       <h2>ブロック設定</h2>
-      <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
+      <p>表示方法を調整できます。ファイルブロックは名前とプレビュー表示をここで設定できます。</p>
 
       <div class="field">
         <label>
@@ -503,14 +570,14 @@
         </label>
       </div>
 
-      <div class="field">
+      <div class="field hidden" id="blockWrapField">
         <label>
           <input id="blockWrapToggle" type="checkbox" />
           文字を折り返す
         </label>
       </div>
 
-      <div class="field">
+      <div class="field hidden" id="blockHeightField">
         <label>
           <input id="blockHeightToggle" type="checkbox" />
           縦の大きさを指定する
@@ -522,9 +589,33 @@
         <input id="blockRowsInput" type="number" min="1" max="50" step="1" />
       </div>
 
+      <div class="field hidden" id="blockFileNameField">
+        <label for="blockFileNameInput">ファイル名</label>
+        <input id="blockFileNameInput" type="text" placeholder="例：あ" />
+      </div>
+
+      <div class="field hidden" id="blockFilePreviewField">
+        <label>
+          <input id="blockFilePreviewToggle" type="checkbox" />
+          ファイルをプレビュー
+        </label>
+      </div>
+
       <div class="toolbar">
         <button class="btn" id="blockSettingsCancelBtn" type="button">キャンセル</button>
         <button class="btn primary" id="blockSettingsSaveBtn" type="button">保存して閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="addBlockDialog">
+    <div class="dialog-body">
+      <h2>ブロックを追加</h2>
+      <p>追加する種類を選んでね。</p>
+      <div class="toolbar" style="margin:14px 0 0">
+        <button class="btn primary" id="addTextBlockBtn" type="button">テキスト</button>
+        <button class="btn" id="addFileBlockBtn" type="button">ファイル</button>
+        <button class="btn" id="addBlockCancelBtn" type="button">キャンセル</button>
       </div>
     </div>
   </dialog>
@@ -577,6 +668,18 @@
     </div>
   </dialog>
 
+  <dialog id="filePreviewDialog">
+    <div class="dialog-body">
+      <h2 id="filePreviewTitle">ファイル</h2>
+      <div class="notice" id="filePreviewMeta">内容を表示しています。</div>
+      <div class="file-preview-shell" id="filePreviewBody" style="margin-top:14px"></div>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn primary" id="filePreviewDownloadBtn" type="button">ダウンロード</button>
+        <button class="btn" id="filePreviewCloseBtn" type="button">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
     import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
@@ -621,6 +724,13 @@
     const blockHeightToggle = document.getElementById('blockHeightToggle');
     const blockRowsField = document.getElementById('blockRowsField');
     const blockRowsInput = document.getElementById('blockRowsInput');
+    const blockWrapField = document.getElementById('blockWrapField');
+    const blockHeightField = document.getElementById('blockHeightField');
+    const blockFileNameField = document.getElementById('blockFileNameField');
+    const blockFileNameInput = document.getElementById('blockFileNameInput');
+    const blockFilePreviewField = document.getElementById('blockFilePreviewField');
+    const blockFilePreviewToggle = document.getElementById('blockFilePreviewToggle');
+    const addBlockDialog = document.getElementById('addBlockDialog');
     const mergeDialog = document.getElementById('mergeDialog');
     const mergeTargetInput = document.getElementById('mergeTargetInput');
     const idDialog = document.getElementById('idDialog');
@@ -630,6 +740,12 @@
     const shareUrlEl = document.getElementById('shareUrl');
     const shareNoticeEl = document.getElementById('shareNotice');
     const qrBox = document.getElementById('qrBox');
+    const filePreviewDialog = document.getElementById('filePreviewDialog');
+    const filePreviewTitle = document.getElementById('filePreviewTitle');
+    const filePreviewMeta = document.getElementById('filePreviewMeta');
+    const filePreviewBody = document.getElementById('filePreviewBody');
+    const filePreviewDownloadBtn = document.getElementById('filePreviewDownloadBtn');
+    const filePreviewCloseBtn = document.getElementById('filePreviewCloseBtn');
 
     const state = {
       db: null,
@@ -646,6 +762,7 @@
       shareMode: 'view',
       authError: '',
       pendingBlockSettingsId: null,
+      previewFileBlockId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
       moveBlockId: null
     };
@@ -697,33 +814,175 @@
       return template.innerHTML;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
+    const QUOTE_PAIRS = { "'": "'", "’": "’", '"': '"', "「": "」", "『": "』", "“": "”" };
 
-      const sizeMatch = text.match(/^S(\d{1,3})$/);
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
+    function quoteCloseFor(openChar) {
+      return QUOTE_PAIRS[openChar] || '';
     }
 
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}"></span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px"></span>`;
-      }
-      return '';
+    function readQuotedSegment(text, startIndex) {
+      const open = text[startIndex];
+      const close = quoteCloseFor(open);
+      if (!close) return null;
+      const end = text.indexOf(close, startIndex + 1);
+      if (end < 0) return null;
+      return { content: text.slice(startIndex + 1, end), endIndex: end + 1 };
     }
 
-    function parseStyledSource(input) {
+    function isHexColorToken(token) {
+      return /^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/.test(token);
+    }
+
+    function isSizeToken(token) {
+      return /^S\d{1,3}$/.test(token);
+    }
+
+    function inlineTextToHtml(text) {
+      return String(text ?? '').replace(/\r\n?/g, '\n').split('\n').map((part) => esc(part)).join('<br>');
+    }
+
+    function isProbablyUrl(text) {
+      const value = String(text ?? '').trim();
+      if (!value) return false;
+      try {
+        const url = new URL(value);
+        return ['http:', 'https:', 'ftp:', 'mailto:'].includes(url.protocol);
+      } catch {
+        return false;
+      }
+    }
+
+    function looksLikeHtml(text) {
+      const value = String(text ?? '').trim();
+      if (!value) return false;
+      if (/^<!doctype\s+html/i.test(value)) return true;
+      if (/^<html[\s>]/i.test(value)) return true;
+      return /<\/?[a-z][\s\S]*>/i.test(value);
+    }
+
+    function safeUrlHref(value) {
+      const text = String(value ?? '').trim();
+      if (!text) return '';
+      try {
+        const url = new URL(text, location.href);
+        if (!['http:', 'https:', 'mailto:', 'ftp:'].includes(url.protocol)) return '';
+        return url.href;
+      } catch {
+        return '';
+      }
+    }
+
+    function sanitizePreviewHtml(value) {
+      const template = document.createElement('template');
+      template.innerHTML = String(value ?? '');
+
+      const allowed = new Set(['A', 'B', 'BR', 'CODE', 'DIV', 'EM', 'I', 'IMG', 'LI', 'OL', 'P', 'PRE', 'S', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'U', 'UL', 'BLOCKQUOTE']);
+      const safeAttr = (node, attr) => {
+        const name = attr.name.toLowerCase();
+        const val = attr.value;
+        if (name.startsWith('on')) return false;
+        if (node.tagName === 'A' && name === 'href') return !!safeUrlHref(val);
+        if (node.tagName === 'IMG' && ['src', 'alt', 'title', 'width', 'height', 'loading'].includes(name)) return true;
+        if (node.tagName === 'A' && ['title', 'target', 'rel'].includes(name)) return true;
+        if (node.tagName === 'SPAN' && ['style'].includes(name)) return true;
+        if (['title', 'style'].includes(name)) return true;
+        return false;
+      };
+
+      const walk = (root) => {
+        const nodes = Array.from(root.querySelectorAll('*'));
+        for (const node of nodes) {
+          if (!allowed.has(node.tagName)) {
+            node.replaceWith(...node.childNodes);
+            continue;
+          }
+          [...node.attributes].forEach((attr) => {
+            if (!safeAttr(node, attr)) node.removeAttribute(attr.name);
+          });
+          if (node.tagName === 'A') {
+            const href = safeUrlHref(node.getAttribute('href') || '');
+            if (!href) {
+              node.replaceWith(...node.childNodes);
+              continue;
+            }
+            node.setAttribute('href', href);
+            node.setAttribute('target', '_blank');
+            node.setAttribute('rel', 'noopener noreferrer');
+          }
+          if (node.tagName === 'IMG') {
+            const src = safeUrlHref(node.getAttribute('src') || '') || String(node.getAttribute('src') || '').trim();
+            if (!src && !String(node.getAttribute('src') || '').startsWith('data:')) {
+              node.removeAttribute('src');
+            }
+            node.setAttribute('loading', 'lazy');
+            node.setAttribute('decoding', 'async');
+          }
+        }
+      };
+
+      walk(template.content);
+      return template.innerHTML;
+    }
+
+    function filePayloadKind(payload = {}) {
+      const kind = String(payload.kind || '').toLowerCase();
+      if (['upload', 'html', 'url', 'text'].includes(kind)) return kind;
+      if (typeof payload.url === 'string' && payload.url.trim()) return 'url';
+      if (typeof payload.html === 'string' && payload.html.trim()) return 'html';
+      if (typeof payload.text === 'string' && payload.text.trim()) return 'text';
+      return 'text';
+    }
+
+    function normalizeFilePayload(payload = {}) {
+      const kind = filePayloadKind(payload);
+      return {
+        kind,
+        fileName: String(payload.fileName || payload.name || '').trim(),
+        mimeType: String(payload.mimeType || '').trim(),
+        dataUrl: typeof payload.dataUrl === 'string' ? payload.dataUrl : '',
+        text: typeof payload.text === 'string' ? payload.text : '',
+        html: typeof payload.html === 'string' ? payload.html : '',
+        url: typeof payload.url === 'string' ? payload.url : '',
+        size: Math.max(0, Number(payload.size || 0) || 0)
+      };
+    }
+
+    function normalizeBlock(block = {}) {
+      const type = block.type === 'file' ? 'file' : 'text';
+      if (type === 'file') {
+        return {
+          id: block.id || uid8(),
+          type,
+          name: String(block.name || block.file?.fileName || 'ファイル').trim() || 'ファイル',
+          preview: block.preview !== false,
+          visible: block.visible !== false,
+          file: normalizeFilePayload(block.file || block.payload || block.asset || {})
+        };
+      }
+
+      const source = typeof block.source === 'string'
+        ? block.source
+        : typeof block.text === 'string'
+          ? block.text
+          : htmlToPlainText(block.html || '');
+
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : renderTextBlockHtml(source);
+
+      return {
+        id: block.id || uid8(),
+        type,
+        source,
+        html,
+        visible: block.visible !== false,
+        wrap: block.wrap !== false,
+        heightEnabled: block.heightEnabled === true,
+        rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
+      };
+    }
+
+    function renderTextBlockHtml(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
 
       let html = '';
@@ -757,22 +1016,60 @@
         if (color || size) openSpan();
       };
 
+      const emitQuotedSpan = (style, content) => {
+        closeSpan();
+        const parts = String(content ?? '').split('\n').map((part) => esc(part));
+        html += `<span style="${style}">${parts.join('<br>')}</span>`;
+        if (color || size) openSpan();
+      };
+
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
+        if (text.startsWith('file(', i)) {
+          const endParen = text.indexOf(')', i + 5);
+          if (endParen > i + 5) {
+            const fileName = text.slice(i + 5, endParen).trim();
+            const nextChar = text[endParen + 1];
+            const quoted = readQuotedSegment(text, endParen + 1);
+            if (fileName && quoted) {
+              const labelHtml = inlineTextToHtml(quoted.content);
+              html += `<a href="#" class="file-ref" data-file-ref="${esc(fileName)}">${labelHtml}</a>`;
+              i = quoted.endIndex;
+              continue;
+            }
+          }
+        }
+
         const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/);
         if (colorMatch) {
-          color = `#${colorMatch[1]}`;
+          const token = `#${colorMatch[1]}`;
+          const nextIndex = i + colorMatch[0].length;
+          const quoted = readQuotedSegment(text, nextIndex);
+          if (quoted) {
+            emitQuotedSpan(`color:${token}`, quoted.content);
+            i = quoted.endIndex;
+            continue;
+          }
+          color = token;
           reopen();
-          i += colorMatch[0].length;
+          i = nextIndex;
           continue;
         }
 
         const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
         if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          const token = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          const nextIndex = i + sizeMatch[0].length;
+          const quoted = readQuotedSegment(text, nextIndex);
+          if (quoted) {
+            emitQuotedSpan(`font-size:${token}px`, quoted.content);
+            i = quoted.endIndex;
+            continue;
+          }
+          size = token;
           reopen();
-          i += sizeMatch[0].length;
+          i = nextIndex;
           continue;
         }
 
@@ -788,7 +1085,102 @@
       return html;
     }
 
+    function parseStyledSource(input) {
+      return renderTextBlockHtml(input);
+    }
+
+    function getStandaloneStyleCommand(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      if (colorMatch) {
+        return { type: 'color', value: `#${colorMatch[1]}` };
+      }
+
+      const sizeMatch = text.match(/^S(\d{1,3})$/);
+      if (sizeMatch) {
+        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
+      }
+
+      return null;
+    }
+
+    function renderStandaloneStyleCommand(command) {
+      if (!command) return '';
+      if (command.type === 'color') {
+        return `<span style="color:${esc(command.value)}"></span>`;
+      }
+      if (command.type === 'size') {
+        return `<span style="font-size:${esc(command.value)}px"></span>`;
+      }
+      return '';
+    }
+
     function getCookie(name) {
+      const parts = document.cookie ? document.cookie.split('; ') : [];
+      for (const part of parts) {
+        const idx = part.indexOf('=');
+        const key = idx >= 0 ? part.slice(0, idx) : part;
+        if (key === name) return decodeURIComponent(idx >= 0 ? part.slice(idx + 1) : '');
+      }
+      return '';
+    }
+
+    function setCookie(name, value, days = 3650) {
+      document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${days * 24 * 60 * 60}; SameSite=Lax`;
+    }
+
+    function creatorId() {
+      let id = getCookie(OWNER_COOKIE);
+      if (!id) {
+        id = uid8();
+        setCookie(OWNER_COOKIE, id);
+      }
+      return id;
+    }
+
+    function setCreatorId(newId) {
+      const normalized = String(newId || '').trim().slice(0, 32);
+      if (!normalized) return false;
+      setCookie(OWNER_COOKIE, normalized);
+      return true;
+    }
+
+    function basePageUrl() {
+      return `${location.origin}${location.pathname.replace(/index\.html$/, '')}`;
+    }
+
+    function siteUrl(siteId, key = null) {
+      if (!siteId) return basePageUrl();
+      return `${basePageUrl()}#/${siteId}${key ? `/${key}` : ''}`;
+    }
+
+    function parseRoute() {
+      const hash = decodeURI(location.hash || '');
+      if (!hash.startsWith('#/')) return { name: 'home', siteId: null, key: null };
+      const parts = hash.slice(2).split('/');
+      const siteId = parts[0] || null;
+      const key = parts[1] || null;
+      if (siteId === 'create') return { name: 'create', siteId: null, key: null };
+      return { name: 'site', siteId, key };
+    }
+
+    function isDarkMode() {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    function addBarBackground() {
+      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
+      return isDarkMode() ? `rgba(17,24,39,${alpha})` : `rgba(255,255,255,${alpha})`;
+    }
+
+    function addBlockButtonStyle() {
+      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
+      if (isDarkMode()) {
+        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
+      }
+      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
+    }
+function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -907,6 +1299,468 @@
       return `min-height: calc(${rows} * 1.8em + 28px);`;
     }
 
+    function blockHeightStyle(block) {
+      if (!block.heightEnabled) return '';
+      const rows = Math.max(1, Math.min(50, Number(block.rows || 3) || 3));
+      return `min-height: calc(${rows} * 1.8em + 28px);`;
+    }
+
+    function fileBlockMetaLabel(block) {
+      const payload = normalizeFilePayload(block.file);
+      if (payload.kind === 'upload') return payload.fileName || block.name || 'ファイル';
+      if (payload.kind === 'html') return 'HTML';
+      if (payload.kind === 'url') return 'URL';
+      return 'テキスト';
+    }
+
+    function blockDisplayName(block) {
+      if (!block) return 'ブロック';
+      if (block.type === 'file') return block.name || 'ファイル';
+      return 'テキスト';
+    }
+
+    function findFileBlockByName(name) {
+      const target = String(name || '').trim();
+      if (!target || !state.current?.blocks) return null;
+      return state.current.blocks.find((block) => block.type === 'file' && String(block.name || '').trim() === target) || null;
+    }
+
+    function downloadBlob(blob, fileName) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function dataUrlToBlob(dataUrl) {
+      const value = String(dataUrl || '');
+      const match = value.match(/^data:([^;,]+)?(;base64)?,([\s\S]*)$/);
+      if (!match) return new Blob([value], { type: 'application/octet-stream' });
+      const mimeType = match[1] || 'application/octet-stream';
+      const isBase64 = !!match[2];
+      const data = match[3] || '';
+      if (isBase64) {
+        const bin = atob(data);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: mimeType });
+      }
+      return new Blob([decodeURIComponent(data)], { type: mimeType });
+    }
+
+    function fileExtFromMime(mimeType) {
+      const value = String(mimeType || '').toLowerCase();
+      if (value.includes('png')) return 'png';
+      if (value.includes('jpeg') || value.includes('jpg')) return 'jpg';
+      if (value.includes('webp')) return 'webp';
+      if (value.includes('gif')) return 'gif';
+      if (value.includes('html')) return 'html';
+      if (value.includes('json')) return 'json';
+      if (value.includes('xml')) return 'xml';
+      if (value.startsWith('text/')) return 'txt';
+      if (value.includes('pdf')) return 'pdf';
+      if (value.includes('mp4')) return 'mp4';
+      if (value.includes('webm')) return 'webm';
+      if (value.includes('mp3')) return 'mp3';
+      if (value.includes('wav')) return 'wav';
+      return 'bin';
+    }
+
+    function fileNameWithExt(name, ext) {
+      const base = String(name || 'download').trim() || 'download';
+      if (/\.[a-z0-9]{1,8}$/i.test(base)) return base;
+      return `${base}.${ext}`;
+    }
+
+    function safeTextFromPayload(payload) {
+      if (typeof payload.text === 'string' && payload.text.trim()) return payload.text;
+      if (typeof payload.url === 'string' && payload.url.trim()) return payload.url;
+      if (typeof payload.html === 'string' && payload.html.trim()) return htmlToPlainText(payload.html);
+      return '';
+    }
+
+    function renderFilePreviewContent(payload, fileName = '') {
+      const kind = filePayloadKind(payload);
+      if (kind === 'html') {
+        return `<div class="file-preview-html">${sanitizePreviewHtml(payload.html || '')}</div>`;
+      }
+      if (kind === 'url') {
+        const href = safeUrlHref(payload.url || '');
+        const label = esc(href || payload.url || '');
+        return href
+          ? `<p style="margin:0 0 12px"><a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${label}</a></p>`
+          : `<pre class="file-preview-text">${label}</pre>`;
+      }
+      if (kind === 'upload') {
+        const mime = String(payload.mimeType || '').toLowerCase();
+        if (mime.startsWith('image/') && payload.dataUrl) {
+          return `<img class="file-preview-media" src="${esc(payload.dataUrl)}" alt="${esc(fileName || payload.fileName || 'file')}">`;
+        }
+        if (mime.startsWith('video/') && payload.dataUrl) {
+          return `<video class="file-preview-media" controls playsinline src="${esc(payload.dataUrl)}"></video>`;
+        }
+        if (mime.startsWith('audio/') && payload.dataUrl) {
+          return `<audio class="file-preview-media" controls src="${esc(payload.dataUrl)}"></audio>`;
+        }
+        if ((mime.includes('pdf') || payload.fileName.toLowerCase().endsWith('.pdf')) && payload.dataUrl) {
+          return `<iframe class="file-preview-frame" src="${esc(payload.dataUrl)}" title="${esc(fileName || payload.fileName || 'file')}"></iframe>`;
+        }
+        const text = safeTextFromPayload(payload);
+        if (text) return `<pre class="file-preview-text">${esc(text)}</pre>`;
+        if (payload.dataUrl) {
+          return `<p style="margin:0">ファイル内容を表示できない形式だよ。ダウンロードして開いてね。</p>`;
+        }
+      }
+      const text = safeTextFromPayload(payload);
+      if (text) return `<pre class="file-preview-text">${esc(text)}</pre>`;
+      return '<p style="margin:0">内容がありません。</p>';
+    }
+
+    function fileDownloadInfo(block) {
+      const payload = normalizeFilePayload(block.file);
+      const kind = filePayloadKind(payload);
+      if (kind === 'upload') {
+        return {
+          name: fileNameWithExt(block.name || payload.fileName || 'file', fileExtFromMime(payload.mimeType || payload.fileName || '')),
+          blob: payload.dataUrl ? dataUrlToBlob(payload.dataUrl) : new Blob([safeTextFromPayload(payload)], { type: payload.mimeType || 'application/octet-stream' }),
+          openUrl: ''
+        };
+      }
+      if (kind === 'html') {
+        const html = payload.html || '';
+        return {
+          name: fileNameWithExt(block.name || 'file', 'html'),
+          blob: new Blob([html], { type: 'text/html;charset=utf-8' }),
+          openUrl: ''
+        };
+      }
+      if (kind === 'url') {
+        const href = safeUrlHref(payload.url || '');
+        return {
+          name: fileNameWithExt(block.name || 'file', 'url'),
+          blob: new Blob([`${payload.url || ''}\n`], { type: 'text/plain;charset=utf-8' }),
+          openUrl: href
+        };
+      }
+      const text = safeTextFromPayload(payload);
+      return {
+        name: fileNameWithExt(block.name || 'file', 'txt'),
+        blob: new Blob([text], { type: 'text/plain;charset=utf-8' }),
+        openUrl: ''
+      };
+    }
+
+    function openFilePreview(blockId) {
+      if (!state.current || !blockId || !filePreviewDialog) return;
+      const block = state.current.blocks.find((item) => item.id === blockId && item.type === 'file');
+      if (!block) return;
+      const payload = normalizeFilePayload(block.file);
+      const kind = filePayloadKind(payload);
+
+      state.previewFileBlockId = blockId;
+      filePreviewTitle.textContent = block.name || 'ファイル';
+      filePreviewMeta.textContent = kind === 'upload'
+        ? `${payload.fileName || block.name || 'ファイル'} / ${payload.mimeType || 'unknown'}`
+        : kind === 'html'
+          ? 'HTMLとして表示しています。'
+          : kind === 'url'
+            ? 'URLとして表示しています。'
+            : 'テキストとして表示しています。';
+      filePreviewBody.innerHTML = renderFilePreviewContent(payload, block.name || payload.fileName || '');
+      const info = fileDownloadInfo(block);
+      filePreviewDownloadBtn.textContent = kind === 'url' ? 'URLを開く' : 'ダウンロード';
+      filePreviewDownloadBtn.dataset.blockId = blockId;
+      filePreviewDownloadBtn.dataset.openUrl = info.openUrl || '';
+      if (!filePreviewDialog.open) filePreviewDialog.showModal();
+    }
+
+    function closeFilePreview() {
+      state.previewFileBlockId = null;
+      if (filePreviewDialog?.open) filePreviewDialog.close();
+    }
+
+    async function readFileFromClipboard() {
+      if (!navigator.clipboard || !navigator.clipboard.read) return null;
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          if (item.types.includes('text/html')) {
+            const blob = await item.getType('text/html');
+            return { kind: 'html', html: await blob.text() };
+          }
+          if (item.types.includes('text/plain')) {
+            const blob = await item.getType('text/plain');
+            const text = await blob.text();
+            return { kind: isProbablyUrl(text) ? 'url' : looksLikeHtml(text) ? 'html' : 'text', ...(isProbablyUrl(text) ? { url: text.trim() } : looksLikeHtml(text) ? { html: text } : { text }) };
+          }
+          for (const type of item.types) {
+            if (!type.startsWith('image/') && !type.startsWith('audio/') && !type.startsWith('video/') && !type.startsWith('application/')) continue;
+            try {
+              const blob = await item.getType(type);
+              const ext = fileExtFromMime(type);
+              const fileName = `clipboard.${ext}`;
+              return {
+                kind: 'upload',
+                file: new File([blob], fileName, { type })
+              };
+            } catch {}
+          }
+        }
+      } catch {}
+      return null;
+    }
+
+    async function readTextClipboard() {
+      try {
+        if (navigator.clipboard?.readText) return await navigator.clipboard.readText();
+      } catch {}
+      return null;
+    }
+
+    async function getPastedPayload() {
+      const fileClip = await readFileFromClipboard();
+      if (fileClip?.kind === 'upload' && fileClip.file) return fileClip;
+      const text = await readTextClipboard();
+      if (typeof text === 'string' && text.length) {
+        if (looksLikeHtml(text)) return { kind: 'html', html: text };
+        if (isProbablyUrl(text)) return { kind: 'url', url: text.trim() };
+        return { kind: 'text', text };
+      }
+      return null;
+    }
+
+    async function fileToDataUrl(file) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('ファイル読み込みに失敗したよ'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function normalizeUploadedFile(file) {
+      const dataUrl = await fileToDataUrl(file);
+      let text = '';
+      let html = '';
+      const type = String(file.type || '').toLowerCase();
+      if (type.startsWith('text/') || type.includes('json') || type.includes('xml') || /\.(txt|html?|json|xml|md|csv|js|css|svg)$/i.test(file.name || '')) {
+        try {
+          text = await file.text();
+          if (looksLikeHtml(text)) html = text;
+        } catch {}
+      }
+      return {
+        kind: 'upload',
+        fileName: file.name || 'file',
+        mimeType: file.type || '',
+        dataUrl,
+        text,
+        html,
+        url: '',
+        size: Number(file.size || 0) || 0
+      };
+    }
+
+    async function setFileBlockFromFile(blockId, file) {
+      if (!state.current || !blockId || !file) return;
+      const idx = state.current.blocks.findIndex((b) => b.id === blockId && b.type === 'file');
+      if (idx < 0) return;
+      const payload = await normalizeUploadedFile(file);
+      state.current.blocks[idx].file = payload;
+      if (!String(state.current.blocks[idx].name || '').trim()) state.current.blocks[idx].name = file.name || 'ファイル';
+      state.currentSaved = false;
+      renderApp();
+    }
+
+    async function setFileBlockFromClipboard(blockId) {
+      if (!state.current || !blockId) return;
+      const idx = state.current.blocks.findIndex((b) => b.id === blockId && b.type === 'file');
+      if (idx < 0) return;
+      const payload = await getPastedPayload();
+      if (!payload) {
+        alert('クリップボードから内容を取れなかったよ');
+        return;
+      }
+      if (payload.kind === 'upload' && payload.file) {
+        const normalized = await normalizeUploadedFile(payload.file);
+        state.current.blocks[idx].file = normalized;
+        if (!String(state.current.blocks[idx].name || '').trim()) state.current.blocks[idx].name = payload.file.name || 'ファイル';
+      } else if (payload.kind === 'html') {
+        state.current.blocks[idx].file = normalizeFilePayload({ kind: 'html', html: sanitizePreviewHtml(payload.html || ''), mimeType: 'text/html', fileName: state.current.blocks[idx].name || 'HTML' });
+      } else if (payload.kind === 'url') {
+        state.current.blocks[idx].file = normalizeFilePayload({ kind: 'url', url: String(payload.url || '').trim(), mimeType: 'text/uri-list', fileName: state.current.blocks[idx].name || 'URL' });
+      } else {
+        state.current.blocks[idx].file = normalizeFilePayload({ kind: 'text', text: String(payload.text || ''), mimeType: 'text/plain', fileName: state.current.blocks[idx].name || 'テキスト' });
+      }
+      state.currentSaved = false;
+      renderApp();
+    }
+
+    function openFileBlockById(blockId) {
+      const block = state.current?.blocks?.find((item) => item.id === blockId && item.type === 'file');
+      if (!block) return;
+      const payload = normalizeFilePayload(block.file);
+      const kind = filePayloadKind(payload);
+      if (block.preview || kind === 'html') {
+        openFilePreview(block.id);
+        return;
+      }
+      if (kind === 'url') {
+        const href = safeUrlHref(payload.url || '');
+        if (href) window.open(href, '_blank', 'noopener,noreferrer');
+        else openFilePreview(block.id);
+        return;
+      }
+      const info = fileDownloadInfo(block);
+      downloadBlob(info.blob, info.name);
+    }
+
+    function openReferencedFile(name) {
+      const block = findFileBlockByName(name);
+      if (!block) {
+        alert(`ファイル「${name}」が見つからないよ`);
+        return;
+      }
+      openFileBlockById(block.id);
+    }
+
+    function applyFilePreviewToggleState() {
+      const block = state.current?.blocks?.find((item) => item.id === state.pendingBlockSettingsId);
+      const isFile = block?.type === 'file';
+      blockWrapField?.classList.toggle('hidden', isFile);
+      blockHeightField?.classList.toggle('hidden', isFile);
+      blockRowsField?.classList.toggle('hidden', isFile);
+      blockFileNameField?.classList.toggle('hidden', !isFile);
+      blockFilePreviewField?.classList.toggle('hidden', !isFile);
+    }
+
+    function serializeTextBlock(block) {
+      const source = String(block.source || '');
+      return {
+        id: block.id,
+        type: 'text',
+        source,
+        html: renderTextBlockHtml(source),
+        visible: block.visible !== false,
+        wrap: block.wrap !== false,
+        heightEnabled: block.heightEnabled === true,
+        rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
+      };
+    }
+
+    function serializeFileBlock(block) {
+      return {
+        id: block.id,
+        type: 'file',
+        name: String(block.name || 'ファイル').trim() || 'ファイル',
+        preview: block.preview !== false,
+        visible: block.visible !== false,
+        file: normalizeFilePayload(block.file || {})
+      };
+    }
+
+    function createTextBlock() {
+      return normalizeBlock({
+        id: uid8(),
+        type: 'text',
+        source: '',
+        html: '',
+        visible: true,
+        wrap: true,
+        heightEnabled: false,
+        rows: 3
+      });
+    }
+
+    function createFileBlock() {
+      return normalizeBlock({
+        id: uid8(),
+        type: 'file',
+        name: 'ファイル',
+        preview: true,
+        visible: true,
+        file: normalizeFilePayload({ kind: 'text', text: '', mimeType: 'text/plain', fileName: 'ファイル' })
+      });
+    }
+
+    function openAddBlockDialog() {
+      if (addBlockDialog && !addBlockDialog.open) addBlockDialog.showModal();
+    }
+
+    function closeAddBlockDialog() {
+      if (addBlockDialog?.open) addBlockDialog.close();
+    }
+
+    function addBlockByType(type) {
+      if (!state.current) return;
+      const block = type === 'file' ? createFileBlock() : createTextBlock();
+      state.current.blocks.push(block);
+      state.currentSaved = false;
+      renderApp();
+      if (type === 'text') {
+        state.editingBlockId = block.id;
+      }
+      focusBlockEditor(block.id);
+    }
+
+    function updateFilePreviewDialogButtons() {
+      if (!state.previewFileBlockId || !state.current) return;
+      const block = state.current.blocks.find((item) => item.id === state.previewFileBlockId && item.type === 'file');
+      if (!block) return;
+      const payload = normalizeFilePayload(block.file);
+      const kind = filePayloadKind(payload);
+      filePreviewDownloadBtn.textContent = kind === 'url' ? 'URLを開く' : 'ダウンロード';
+      filePreviewDownloadBtn.dataset.blockId = block.id;
+      filePreviewDownloadBtn.dataset.openUrl = kind === 'url' ? (safeUrlHref(payload.url || '') || '') : '';
+    }
+
+    function refreshFilePreviewDialog() {
+      if (!state.previewFileBlockId || !state.current) return;
+      const block = state.current.blocks.find((item) => item.id === state.previewFileBlockId && item.type === 'file');
+      if (!block) return;
+      const payload = normalizeFilePayload(block.file);
+      const kind = filePayloadKind(payload);
+      filePreviewTitle.textContent = block.name || 'ファイル';
+      filePreviewMeta.textContent = kind === 'upload'
+        ? `${payload.fileName || block.name || 'ファイル'} / ${payload.mimeType || 'unknown'}`
+        : kind === 'html'
+          ? 'HTMLとして表示しています。'
+          : kind === 'url'
+            ? 'URLとして表示しています。'
+            : 'テキストとして表示しています。';
+      filePreviewBody.innerHTML = renderFilePreviewContent(payload, block.name || payload.fileName || '');
+      updateFilePreviewDialogButtons();
+    }
+
+    function syncBlockSettingsDialog() {
+      const block = state.current?.blocks?.find((item) => item.id === state.pendingBlockSettingsId);
+      if (!block) return;
+      const isFile = block.type === 'file';
+      blockVisibleToggle.checked = block.visible !== false;
+      blockWrapToggle.checked = block.wrap !== false;
+      blockHeightToggle.checked = block.heightEnabled === true;
+      blockRowsInput.value = String(Math.max(1, Math.min(50, Number(block.rows || 3) || 3)));
+      blockFileNameInput.value = String(block.name || '');
+      blockFilePreviewToggle.checked = block.preview !== false;
+      blockWrapField?.classList.toggle('hidden', isFile);
+      blockHeightField?.classList.toggle('hidden', isFile);
+      blockRowsField.classList.toggle('hidden', isFile || !blockHeightToggle.checked);
+      blockFileNameField?.classList.toggle('hidden', !isFile);
+      blockFilePreviewField?.classList.toggle('hidden', !isFile);
+    }
+
+    function openBlockSettingsModal(blockId = null) {
+      if (!state.current) return;
+      state.pendingBlockSettingsId = blockId;
+      const target = blockId ? state.current.blocks.find((b) => b.id === blockId) : null;
+      if (!target) return;
+      syncBlockSettingsDialog();
+      if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
+    }
     function isMine(site) {
       return Boolean(site && site.ownerUid && site.ownerUid === state.uid);
     }
@@ -935,7 +1789,13 @@
     function siteSearchText(site) {
       const blockText = (site.blocks || [])
         .filter((b) => b.visible !== false)
-        .map((b) => String(b.html || '').replace(/<[^>]+>/g, ' '))
+        .map((b) => {
+          if (b.type === 'file') {
+            const payload = normalizeFilePayload(b.file);
+            return [b.name || '', payload.fileName || '', payload.text || '', payload.html || '', payload.url || ''].join(' ');
+          }
+          return [b.source || '', String(b.html || '').replace(/<[^>]+>/g, ' ')].join(' ');
+        })
         .join(' ');
       return `${site.title || ''} ${blockText}`.toLowerCase();
     }
@@ -1053,11 +1913,31 @@
       const site = state.current;
       const blocks = (site?.blocks || [])
         .filter((block) => block.visible !== false)
-        .map((block) => `
-          <article class="block" style="${blockHeightStyle(block)}">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
-          </article>
-        `).join('');
+        .map((block) => {
+          if (block.type === 'file') {
+            const payload = normalizeFilePayload(block.file);
+            const kind = filePayloadKind(payload);
+            const previewBadge = block.preview ? 'プレビューON' : 'ダウンロード';
+            const contentHtml = renderFilePreviewContent(payload, block.name || payload.fileName || '');
+            return `
+              <article class="block file-block" data-file-open="${esc(block.id)}">
+                <div class="block-head">
+                  <div style="font-weight:900">${esc(block.name || 'ファイル')}</div>
+                  <span class="status-pill">${esc(previewBadge)} / ${esc(fileBlockMetaLabel(block))}</span>
+                </div>
+                <div class="file-block-body">
+                  ${contentHtml}
+                </div>
+              </article>
+            `;
+          }
+
+          return `
+            <article class="block" style="${blockHeightStyle(block)}">
+              <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || renderTextBlockHtml(block.source || '')}</div>
+            </article>
+          `;
+        }).join('');
 
       const statusHtml = canEditCurrent()
         ? `<span class="status-pill good">${state.currentAccess === 'key' ? '共同編集モード' : '編集可能'}</span>`
@@ -1088,14 +1968,43 @@
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
+
+        if (normalized.type === 'file') {
+          const payload = normalizeFilePayload(normalized.file);
+          const kind = filePayloadKind(payload);
+          const summary = renderFilePreviewContent(payload, normalized.name || payload.fileName || '');
+          const actionLabel = normalized.preview ? 'プレビュー' : (kind === 'url' ? 'URLを開く' : 'ダウンロード');
+          return `
+            <article class="block file-block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}" data-file-open="${esc(normalized.id)}">
+              <div class="block-head">
+                <div style="color:var(--muted);font-weight:900">ファイルブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
+                <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
+              </div>
+              <div class="field" style="margin-top:0">
+                <label>ファイル名</label>
+                <input data-file-name="${esc(normalized.id)}" type="text" value="${esc(normalized.name || '')}" placeholder="例：あ">
+              </div>
+              <div class="toolbar" style="justify-content:flex-start;margin-top:8px">
+                <button class="btn small" data-file-action="upload" data-block-id="${esc(normalized.id)}" type="button">アップロード</button>
+                <button class="btn small" data-file-action="paste" data-block-id="${esc(normalized.id)}" type="button">貼り付け</button>
+                <button class="btn small primary" data-file-action="open" data-block-id="${esc(normalized.id)}" type="button">${esc(actionLabel)}</button>
+              </div>
+              <div class="file-block-body" style="margin-top:12px">
+                ${summary || '<div class="empty" style="padding:18px 10px">まだ内容がありません。</div>'}
+              </div>
+            </article>
+          `;
+        }
+
+        const source = typeof normalized.source === 'string' ? normalized.source : htmlToPlainText(normalized.html || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
+          ? `<textarea class="editor-source" data-editor-block="${esc(normalized.id)}" spellcheck="false" wrap="${normalized.wrap === false ? 'off' : 'soft'}" style="${blockHeightStyle(normalized)}">${esc(source)}</textarea>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
           <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}">
             <div class="block-head">
-              <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
+              <div style="color:var(--muted);font-weight:900">テキスト ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
               <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
             </div>
             ${preview}
@@ -1251,19 +2160,6 @@
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
-    }
-
-    function openBlockSettingsModal(blockId = null) {
-      if (!state.current) return;
-      state.pendingBlockSettingsId = blockId;
-      const target = blockId ? state.current.blocks.find((b) => b.id === blockId) : null;
-      if (!target) return;
-      blockVisibleToggle.checked = target.visible !== false;
-      blockWrapToggle.checked = target.wrap !== false;
-      blockHeightToggle.checked = target.heightEnabled === true;
-      blockRowsInput.value = String(Math.max(1, Math.min(50, Number(target.rows || 3) || 3)));
-      blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
-      if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
     }
 
     function openSiteSettingsModal() {
@@ -1437,21 +2333,21 @@
       if (!target) return;
 
       target.visible = !!blockVisibleToggle.checked;
-      target.wrap = !!blockWrapToggle.checked;
-      target.heightEnabled = !!blockHeightToggle.checked;
-      target.rows = target.heightEnabled ? Math.max(1, Math.min(50, Number(blockRowsInput.value || 3) || 3)) : (target.rows || 3);
+      if (target.type === 'file') {
+        target.name = String(blockFileNameInput.value || '').trim() || 'ファイル';
+        target.preview = !!blockFilePreviewToggle.checked;
+      } else {
+        target.wrap = !!blockWrapToggle.checked;
+        target.heightEnabled = !!blockHeightToggle.checked;
+        target.rows = target.heightEnabled ? Math.max(1, Math.min(50, Number(blockRowsInput.value || 3) || 3)) : (target.rows || 3);
+      }
       state.current.updatedAt = Date.now();
 
       setDoc(doc(state.db, COLLECTION, state.current.siteId), {
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((b) => b.type === 'file'
+          ? serializeFileBlock(b)
+          : serializeTextBlock(b)
+        ),
         updatedAt: state.current.updatedAt
       }, { merge: true }).then(async () => {
         await loadAllSites();
@@ -1462,6 +2358,7 @@
     }
 
     async function executeIdMerge() {
+() {
       if (!state.db) return;
 
       const target = String(mergeTargetInput.value || '').trim();
@@ -1519,19 +2416,11 @@
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
       state.current.creatorId = state.current.creatorId || creatorId();
-      state.current.blocks = (state.current.blocks || []).map(normalizeBlock);
+      state.current.blocks = (state.current.blocks || []).map((block) => normalizeBlock(block));
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((block) => block.type === 'file' ? serializeFileBlock(block) : serializeTextBlock(block)),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1549,6 +2438,7 @@
     }
 
     async function openSiteById(siteId, key = null, sync = true) {
+(siteId, key = null, sync = true) {
       if (!state.ready) return;
 
       const site = await loadSiteById(siteId);
@@ -1637,41 +2527,17 @@
     }
 
     function addNewBlock() {
-      if (!state.current) return;
-      const block = normalizeBlock({
-        id: uid8(),
-        source: '',
-        html: '',
-        visible: true,
-        wrap: true,
-        heightEnabled: false,
-        rows: 3
-      });
-      state.current.blocks.push(block);
-      state.currentSaved = false;
-      renderApp();
-      state.editingBlockId = block.id;
-      focusBlockEditor(block.id);
+      openAddBlockDialog();
     }
 
     function updateEditableBlockFromDom(blockId, element) {
       if (!state.current || !blockId || !element) return;
-      const idx = state.current.blocks.findIndex((b) => b.id === blockId);
+      const idx = state.current.blocks.findIndex((b) => b.id === blockId && b.type === 'text');
       if (idx < 0) return;
-
-      const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw);
-
-      state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = html || '<br>';
+      const raw = typeof element.value === 'string' ? element.value : String(element.textContent || '');
+      state.current.blocks[idx].source = raw.replace(/\r/g, '');
+      state.current.blocks[idx].html = renderTextBlockHtml(state.current.blocks[idx].source);
       state.currentSaved = false;
-
-      const selectionKeep = document.activeElement === element;
-      const nextHtml = html || '<br>';
-      if (element.innerHTML !== nextHtml) {
-        element.innerHTML = nextHtml;
-        if (selectionKeep) placeCaretAtEnd(element);
-      }
     }
 
     function handleClick(target) {
@@ -1679,6 +2545,20 @@
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
         if (siteId) openSiteById(siteId, null, true);
+        return;
+      }
+
+      const fileRefBtn = target.closest('[data-file-ref]');
+      if (fileRefBtn) {
+        const name = fileRefBtn.getAttribute('data-file-ref') || '';
+        openReferencedFile(name);
+        return;
+      }
+
+      const fileOpenBtn = target.closest('[data-file-open]');
+      if (fileOpenBtn) {
+        const blockId = fileOpenBtn.getAttribute('data-file-open') || '';
+        openFileBlockById(blockId);
         return;
       }
 
@@ -1694,9 +2574,7 @@
         return;
       }
 
-      const editorBlock = target.closest('[data-editor-block]');
       const editorCard = target.closest('[data-editor-block-card]');
-
       if (state.mode === 'editor' && editorCard) {
         const blockId = editorCard.getAttribute('data-editor-block-card');
 
@@ -1709,9 +2587,33 @@
           moveBlockBefore(state.moveBlockId, blockId);
           return;
         }
+      }
 
-        if (editorBlock) {
-          editorBlock.focus?.();
+      const fileActionBtn = target.closest('[data-file-action]');
+      if (fileActionBtn && state.mode === 'editor') {
+        const action = fileActionBtn.getAttribute('data-file-action');
+        const blockId = fileActionBtn.getAttribute('data-block-id');
+        if (!blockId) return;
+        if (action === 'upload') {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.style.display = 'none';
+          document.body.appendChild(input);
+          input.addEventListener('change', async () => {
+            const file = input.files && input.files[0] ? input.files[0] : null;
+            input.remove();
+            if (!file) return;
+            await setFileBlockFromFile(blockId, file);
+          }, { once: true });
+          input.click();
+          return;
+        }
+        if (action === 'paste') {
+          setFileBlockFromClipboard(blockId);
+          return;
+        }
+        if (action === 'open') {
+          openFileBlockById(blockId);
           return;
         }
       }
@@ -1793,7 +2695,24 @@
       }
 
       if (target.closest('#addBlockBtn')) {
-        addNewBlock();
+        openAddBlockDialog();
+        return;
+      }
+
+      if (target.closest('#addTextBlockBtn')) {
+        closeAddBlockDialog();
+        addBlockByType('text');
+        return;
+      }
+
+      if (target.closest('#addFileBlockBtn')) {
+        closeAddBlockDialog();
+        addBlockByType('file');
+        return;
+      }
+
+      if (target.closest('#addBlockCancelBtn')) {
+        closeAddBlockDialog();
         return;
       }
 
@@ -1887,6 +2806,25 @@
         return;
       }
 
+      if (target.closest('#filePreviewCloseBtn')) {
+        closeFilePreview();
+        return;
+      }
+
+      if (target.closest('#filePreviewDownloadBtn')) {
+        const blockId = filePreviewDownloadBtn?.dataset.blockId || state.previewFileBlockId;
+        const block = state.current?.blocks?.find((item) => item.id === blockId && item.type === 'file');
+        if (!block) return;
+        const payload = normalizeFilePayload(block.file);
+        if (filePreviewDownloadBtn.dataset.openUrl) {
+          window.open(filePreviewDownloadBtn.dataset.openUrl, '_blank', 'noopener,noreferrer');
+          return;
+        }
+        const info = fileDownloadInfo(block);
+        downloadBlob(info.blob, info.name);
+        return;
+      }
+
       const tabBtn = target.closest('[data-home-tab]');
       if (tabBtn) {
         state.homeTab = tabBtn.getAttribute('data-home-tab') || 'mine';
@@ -1953,6 +2891,24 @@
         return;
       }
 
+      if (target.id === 'blockFileNameInput' && state.current) {
+        const block = state.current.blocks.find((item) => item.id === state.pendingBlockSettingsId && item.type === 'file');
+        if (block) {
+          block.name = target.value;
+          state.currentSaved = false;
+        }
+        return;
+      }
+
+      if (target.id === 'blockFilePreviewToggle' && state.current) {
+        const block = state.current.blocks.find((item) => item.id === state.pendingBlockSettingsId && item.type === 'file');
+        if (block) {
+          block.preview = !!target.checked;
+          state.currentSaved = false;
+        }
+        return;
+      }
+
       const editorBlock = target.closest('[data-editor-block]');
       if (state.mode === 'editor' && editorBlock) {
         const blockId = editorBlock.getAttribute('data-editor-block');
@@ -1961,6 +2917,28 @@
     }
 
     function handlePointerDown(event) {
+      if (state.mode !== 'editor') return;
+      if (event.target.closest('input,textarea,button,select,a,label')) return;
+      const card = event.target.closest('[data-editor-block-card]');
+      if (!card) return;
+      if (event.target.closest('[data-block-action]') || event.target.closest('[data-file-action]')) return;
+
+      const blockId = card.getAttribute('data-editor-block-card');
+      if (!blockId) return;
+
+      clearLongPressTimer();
+      longPressCandidateId = blockId;
+      longPressTimer = setTimeout(() => {
+        handleLongPressCandidate(blockId);
+      }, 500);
+    }
+
+    function handlePointerUp() {
+      clearLongPressTimer();
+    }
+
+    function handleKeyDown(event) {
+(event) {
       if (state.mode !== 'editor') return;
       const card = event.target.closest('[data-editor-block-card]');
       if (!card) return;
