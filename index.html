@@ -715,18 +715,16 @@
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
       if (command.type === 'color') {
-        return '';
+        return `<span style="color:${esc(command.value)}"></span>`;
       }
       if (command.type === 'size') {
-        return '';
+        return `<span style="font-size:${esc(command.value)}px"></span>`;
       }
       return '';
     }
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const standalone = getStandaloneStyleCommand(text);
-      if (standalone) return renderStandaloneStyleCommand(standalone);
 
       let html = '';
       let color = '';
@@ -1662,8 +1660,7 @@
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const command = getStandaloneStyleCommand(raw);
-      const html = command ? renderStandaloneStyleCommand(command) : parseStyledSource(raw);
+      const html = parseStyledSource(raw);
 
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
@@ -1674,13 +1671,6 @@
       if (element.innerHTML !== nextHtml) {
         element.innerHTML = nextHtml;
         if (selectionKeep) placeCaretAtEnd(element);
-      }
-
-      if (command) {
-        state.editingBlockId = null;
-        requestAnimationFrame(() => {
-          if (document.activeElement === element) element.blur();
-        });
       }
     }
 
