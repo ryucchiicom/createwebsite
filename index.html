@@ -24,6 +24,7 @@
       --danger:#ef4444;
       --shadow:0 18px 50px rgba(28,36,48,.12);
       --radius:22px;
+      --add-bar-opacity:.92;
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
@@ -67,10 +68,11 @@
     button,input,textarea,select{font:inherit}
     button{cursor:pointer;border:0}
     textarea{resize:vertical}
+
     .app-shell{
       width:min(1120px,100%);
       margin:0 auto;
-      padding:20px 16px 140px;
+      padding:20px 16px 160px;
       position:relative;
       z-index:1;
     }
@@ -233,19 +235,42 @@
     }
     .editor-text:focus{outline:none}
 
-    .rich-editor{
-      min-height:180px;
+    .file-block-shell{
+      display:grid;
+      gap:10px;
+    }
+    .file-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      width:max-content;
+      max-width:100%;
+      padding:10px 14px;
+      border-radius:999px;
+      background:color-mix(in srgb, var(--brand) 10%, var(--surface));
+      border:1px solid color-mix(in srgb, var(--brand) 22%, var(--line));
+      font-weight:800;
+      word-break:break-all;
+    }
+    .file-preview-mini{
       border:1px solid var(--line);
       border-radius:16px;
-      padding:12px 14px;
-      background:var(--surface);
-      line-height:1.8;
-      outline:none;
+      padding:12px;
+      background:var(--surface-muted);
+      overflow:hidden;
     }
-    .rich-editor:focus{
-      border-color:var(--brand);
-      box-shadow:0 0 0 4px rgba(95,99,242,.12);
+    .file-preview-mini img{
+      max-width:100%;
+      display:block;
+      border-radius:12px;
     }
+    .file-link{
+      color:var(--brand-dark);
+      text-decoration:underline;
+      font-weight:800;
+      touch-action:manipulation;
+    }
+    .file-link:active{opacity:.72}
 
     .bottom-add-bar{
       position:fixed;
@@ -278,6 +303,9 @@
       display:block;
       margin:0 auto;
       text-align:center;
+      background:var(--surface);
+      color:var(--ink);
+      border:1px solid var(--line);
     }
 
     .home-gear-btn{
@@ -424,6 +452,94 @@
       100%{transform:rotate(360deg) translate(10px) scale(1)}
     }
 
+    /* add sheet */
+    .sheet-dialog{
+      width:min(720px, 100vw);
+      max-width:100vw;
+      margin:0;
+      border-radius:28px 28px 0 0;
+      position:fixed;
+      left:50%;
+      bottom:-100%;
+      transform:translateX(-50%);
+      transition:bottom .18s ease-out, opacity .18s ease-out;
+      background:var(--surface-soft);
+      backdrop-filter:blur(14px);
+      box-shadow:0 -22px 48px rgba(0,0,0,.22);
+      overflow:hidden;
+    }
+    .sheet-dialog[open]{
+      bottom:0;
+    }
+    .sheet-dialog::backdrop{
+      background:rgba(2,6,23,.32);
+      backdrop-filter:blur(3px);
+    }
+    .sheet-panel{
+      padding:18px 18px 22px;
+      animation:sheetUp .18s ease-out;
+    }
+    @keyframes sheetUp{
+      from{transform:translateY(18px);opacity:.4}
+      to{transform:translateY(0);opacity:1}
+    }
+    .sheet-actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:14px;
+    }
+    .sheet-actions .btn{
+      min-height:56px;
+      border-radius:20px;
+      font-size:1rem;
+    }
+
+    .file-modal-preview{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+      background:var(--surface-muted);
+      margin-top:12px;
+      max-height:50vh;
+      overflow:auto;
+    }
+    .file-modal-preview img{
+      max-width:100%;
+      display:block;
+      border-radius:14px;
+    }
+    .file-modal-preview iframe{
+      width:100%;
+      min-height:50vh;
+      border:0;
+      border-radius:14px;
+      background:#fff;
+    }
+
+    .file-editor-grid{
+      display:grid;
+      gap:12px;
+    }
+    .file-editor-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .file-editor-controls{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    .file-editor-controls .btn{
+      min-height:42px;
+    }
+    .file-source-box{
+      min-height:130px;
+    }
+
     @media (max-width:820px){
       .hero,.editor-layout{grid-template-columns:1fr}
       .editor-top,.viewer-top{
@@ -439,6 +555,12 @@
       .home-gear-btn{
         top:12px;
         right:12px;
+      }
+      .sheet-actions{
+        grid-template-columns:1fr;
+      }
+      .file-editor-controls{
+        grid-template-columns:1fr;
       }
     }
   </style>
@@ -494,7 +616,7 @@
   <dialog id="blockSettingsDialog">
     <div class="dialog-body">
       <h2>ブロック設定</h2>
-      <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
+      <p>表示方法を調整できます。テキストとファイルで少し内容が変わります。</p>
 
       <div class="field">
         <label>
@@ -522,7 +644,42 @@
         <input id="blockRowsInput" type="number" min="1" max="50" step="1" />
       </div>
 
-      <div class="toolbar">
+      <div id="textBlockFields">
+        <div class="notice">
+          テキストブロックでは <strong>file(名前)'表示する文字'</strong> でファイルブロックへリンクできます。
+        </div>
+      </div>
+
+      <div id="fileBlockFields" class="hidden">
+        <div class="field">
+          <label for="fileNameInput">ファイル名</label>
+          <input id="fileNameInput" placeholder="例：資料1" />
+        </div>
+
+        <div class="field">
+          <label>
+            <input id="filePreviewToggle" type="checkbox" />
+            ファイルをプレビュー
+          </label>
+        </div>
+
+        <div class="file-editor-grid">
+          <div class="file-editor-head">
+            <strong>内容</strong>
+            <span class="status-pill" id="fileBlockSourceKindPill">未設定</span>
+          </div>
+
+          <textarea id="fileSourceInput" class="file-source-box" placeholder="URL / HTML / テキストを貼り付けるか、下のボタンで読み込んでね"></textarea>
+
+          <div class="file-editor-controls">
+            <button class="btn" id="filePasteBtn" type="button">クリップボード貼り付け</button>
+            <button class="btn" id="fileUploadBtn" type="button">ファイルをアップロード</button>
+          </div>
+          <input id="fileUploadInput" type="file" class="hidden" />
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top:14px">
         <button class="btn" id="blockSettingsCancelBtn" type="button">キャンセル</button>
         <button class="btn primary" id="blockSettingsSaveBtn" type="button">保存して閉じる</button>
       </div>
@@ -577,6 +734,38 @@
     </div>
   </dialog>
 
+  <dialog id="addMenuDialog" class="sheet-dialog">
+    <div class="sheet-panel">
+      <div class="viewer-top" style="margin-bottom:0">
+        <div>
+          <h2>追加するもの</h2>
+          <p style="margin:6px 0 0">テキストかファイルを選んで追加できます。</p>
+        </div>
+        <button class="btn ghost" id="closeAddMenuBtn" type="button">閉じる</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn primary" id="addTextBlockBtn" type="button">テキスト</button>
+        <button class="btn primary" id="addFileBlockBtn" type="button">ファイル</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="filePreviewDialog">
+    <div class="dialog-body">
+      <div class="viewer-top">
+        <div>
+          <h2 id="filePreviewTitle">ファイル</h2>
+          <p id="filePreviewMeta" style="margin:6px 0 0"></p>
+        </div>
+        <button class="btn ghost" id="closeFilePreviewBtn" type="button">閉じる</button>
+      </div>
+      <div class="toolbar">
+        <button class="btn primary" id="filePreviewDownloadBtn" type="button">ダウンロード</button>
+      </div>
+      <div class="file-modal-preview" id="filePreviewContent"></div>
+    </div>
+  </dialog>
+
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
     import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
@@ -621,6 +810,15 @@
     const blockHeightToggle = document.getElementById('blockHeightToggle');
     const blockRowsField = document.getElementById('blockRowsField');
     const blockRowsInput = document.getElementById('blockRowsInput');
+    const textBlockFields = document.getElementById('textBlockFields');
+    const fileBlockFields = document.getElementById('fileBlockFields');
+    const fileNameInput = document.getElementById('fileNameInput');
+    const filePreviewToggle = document.getElementById('filePreviewToggle');
+    const fileSourceInput = document.getElementById('fileSourceInput');
+    const fileUploadInput = document.getElementById('fileUploadInput');
+    const fileUploadBtn = document.getElementById('fileUploadBtn');
+    const filePasteBtn = document.getElementById('filePasteBtn');
+    const fileBlockSourceKindPill = document.getElementById('fileBlockSourceKindPill');
     const mergeDialog = document.getElementById('mergeDialog');
     const mergeTargetInput = document.getElementById('mergeTargetInput');
     const idDialog = document.getElementById('idDialog');
@@ -630,24 +828,35 @@
     const shareUrlEl = document.getElementById('shareUrl');
     const shareNoticeEl = document.getElementById('shareNotice');
     const qrBox = document.getElementById('qrBox');
+    const addMenuDialog = document.getElementById('addMenuDialog');
+    const filePreviewDialog = document.getElementById('filePreviewDialog');
+    const filePreviewTitle = document.getElementById('filePreviewTitle');
+    const filePreviewMeta = document.getElementById('filePreviewMeta');
+    const filePreviewContent = document.getElementById('filePreviewContent');
+    const filePreviewDownloadBtn = document.getElementById('filePreviewDownloadBtn');
 
     const state = {
       db: null,
       uid: '',
       ready: false,
-      mode: 'loading', // loading | home | viewer | editor | missing | denied | boot-failed
+      mode: 'loading',
       homeSites: [],
       homeTab: 'mine',
       homeSearch: '',
       current: null,
       currentSaved: false,
-      currentAccess: 'view', // view | owner | collaborator | key
+      currentAccess: 'view',
       editingBlockId: null,
       shareMode: 'view',
       authError: '',
       pendingBlockSettingsId: null,
-      addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      moveBlockId: null
+      addBarOpacity: (() => {
+        const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY));
+        return Number.isFinite(v) ? v : 0.92;
+      })(),
+      moveBlockId: null,
+      pendingFilePreview: null,
+      pendingAddType: null
     };
 
     let longPressTimer = null;
@@ -656,6 +865,10 @@
     function uid8() {
       if (crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
       return Math.random().toString(36).slice(2, 10);
+    }
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
     }
 
     function esc(value) {
@@ -678,7 +891,7 @@
       template.innerHTML = String(value ?? '');
 
       template.content.querySelectorAll('*').forEach((node) => {
-        if (!['BR', 'STRONG', 'B', 'SPAN'].includes(node.tagName)) {
+        if (!['BR', 'STRONG', 'B', 'SPAN', 'A', 'IMG', 'P', 'DIV', 'UL', 'OL', 'LI', 'PRE', 'CODE', 'SMALL', 'EM', 'I', 'U'].includes(node.tagName)) {
           node.replaceWith(...node.childNodes);
           return;
         }
@@ -689,6 +902,24 @@
           node.removeAttribute('style');
           if (color) node.style.color = color;
           if (fontSize) node.style.fontSize = fontSize;
+        } else if (node.tagName === 'A') {
+          const href = node.getAttribute('href') || '';
+          const target = node.getAttribute('target') || '';
+          const rel = node.getAttribute('rel') || '';
+          node.setAttribute('href', href);
+          node.setAttribute('target', target || '_blank');
+          node.setAttribute('rel', rel || 'noopener noreferrer');
+          [...node.attributes].forEach((attr) => {
+            if (!['href', 'target', 'rel'].includes(attr.name)) node.removeAttribute(attr.name);
+          });
+        } else if (node.tagName === 'IMG') {
+          const src = node.getAttribute('src') || '';
+          const alt = node.getAttribute('alt') || '';
+          node.setAttribute('src', src);
+          node.setAttribute('alt', alt);
+          [...node.attributes].forEach((attr) => {
+            if (!['src', 'alt'].includes(attr.name)) node.removeAttribute(attr.name);
+          });
         } else {
           [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
         }
@@ -697,95 +928,96 @@
       return template.innerHTML;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
+    function isProbablyUrl(text) {
+      const raw = String(text || '').trim();
+      if (!raw) return false;
+      try {
+        const parsed = new URL(raw);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
       }
-
-      const sizeMatch = text.match(/^S(\d{1,3})$/);
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
     }
 
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}"></span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px"></span>`;
-      }
-      return '';
+    function isProbablyHtml(text) {
+      const raw = String(text || '').trim();
+      if (!raw) return false;
+      return /<\/?[a-z][\s\S]*>/i.test(raw) || /^\s*(<!doctype html>|<html[\s>]|<body[\s>]|<div[\s>]|<p[\s>]|<span[\s>]|<a[\s>])/i.test(raw);
     }
 
-    function parseStyledSource(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+    function detectFileSource(raw) {
+      const text = String(raw ?? '').replace(/\r\n?/g, '\n');
+      if (!text.trim()) return { kind: 'text', text: '' };
+      if (isProbablyHtml(text)) return { kind: 'html', html: sanitizeRichHtml(text), text };
+      if (isProbablyUrl(text)) return { kind: 'url', url: text.trim(), text };
+      return { kind: 'text', text };
+    }
 
+    function renderDetectedFileSource(raw) {
+      const detected = detectFileSource(raw);
+      if (detected.kind === 'html') return detected.html;
+      if (detected.kind === 'url') {
+        const url = esc(detected.url);
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="file-link">${url}</a>`;
+      }
+      return `<div style="white-space:pre-wrap;line-height:1.8">${esc(detected.text)}</div>`;
+    }
+
+    function parseTextSource(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
       let html = '';
-      let color = '';
-      let size = '';
-      let spanOpen = false;
+      let i = 0;
 
-      const currentStyle = () => {
-        const styles = [];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${size}px`);
-        return styles.join(';');
+      const pushPlain = (ch) => {
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
       };
 
-      const closeSpan = () => {
-        if (spanOpen) {
-          html += '</span>';
-          spanOpen = false;
+      while (i < text.length) {
+        const slice = text.slice(i);
+
+        const fileMatch = slice.match(/^file\(([^)]+)\)'([^']*)'/);
+        if (fileMatch) {
+          html += `<a href="#" class="file-link" data-file-ref="${esc(fileMatch[1].trim())}">${esc(fileMatch[2])}</a>`;
+          i += fileMatch[0].length;
+          continue;
         }
-      };
 
-      const openSpan = () => {
-        const style = currentStyle();
-        if (!style) return;
-        html += `<span style="${style}">`;
-        spanOpen = true;
-      };
+        const coloredFileMatch = slice.match(/^color\((#[0-9a-fA-F]{3,6})\)'([^']*)'/);
+        if (coloredFileMatch) {
+          html += `<span style="color:${esc(coloredFileMatch[1])}">${esc(coloredFileMatch[2])}</span>`;
+          i += coloredFileMatch[0].length;
+          continue;
+        }
 
-      const reopen = () => {
-        closeSpan();
-        if (color || size) openSpan();
-      };
+        const sizedMatch = slice.match(/^size\((\d{1,3})\)'([^']*)'/);
+        if (sizedMatch) {
+          const size = Math.max(1, Math.min(256, Number(sizedMatch[1]) || 16));
+          html += `<span style="font-size:${size}px">${esc(sizedMatch[2])}</span>`;
+          i += sizedMatch[0].length;
+          continue;
+        }
 
-      for (let i = 0; i < text.length;) {
-        const ch = text[i];
-
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/);
+        const colorMatch = slice.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/);
         if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          reopen();
+          html += `<span style="color:#${colorMatch[1]}"></span>`;
           i += colorMatch[0].length;
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
-        if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
-          i += sizeMatch[0].length;
+        const sizeToken = slice.match(/^S(\d{1,3})/);
+        if (sizeToken) {
+          const size = Math.max(1, Math.min(256, Number(sizeToken[1]) || 16));
+          html += `<span style="font-size:${size}px"></span>`;
+          i += sizeToken[0].length;
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
-
-        if (ch === '\n') html += '<br>';
-        else html += esc(ch);
-
+        pushPlain(text[i]);
         i += 1;
       }
 
-      closeSpan();
-      return html;
+      return html || '<br>';
     }
 
     function getCookie(name) {
@@ -841,17 +1073,10 @@
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
-    function addBarBackground() {
+    function addBarButtonStyle() {
       const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
-      return isDarkMode() ? `rgba(17,24,39,${alpha})` : `rgba(255,255,255,${alpha})`;
-    }
-
-    function addBlockButtonStyle() {
-      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
-      if (isDarkMode()) {
-        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
-      }
-      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
+      const base = isDarkMode() ? '17,24,39' : '255,255,255';
+      return `background:rgba(${base},${alpha});color:${isDarkMode() ? '#fff' : '#111827'};border:1px solid ${isDarkMode() ? 'rgba(255,255,255,.12)' : 'rgba(17,24,39,.08)'};`;
     }
 
     function persistAddBarOpacity(value) {
@@ -870,14 +1095,47 @@
     }
 
     function normalizeBlock(block = {}) {
-      const html = typeof block.html === 'string' && block.html.trim()
-        ? sanitizeRichHtml(block.html)
-        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+      const type = block.type === 'file' ? 'file' : 'text';
+
+      if (type === 'file') {
+        const raw = String(block.fileText ?? block.source ?? '');
+        const detected = block.fileMode === 'upload'
+          ? {
+              kind: 'upload',
+              originalName: block.fileOriginalName || block.fileName || 'file',
+              mime: block.fileMime || '',
+              dataUrl: block.fileDataUrl || '',
+              text: raw
+            }
+          : detectFileSource(raw);
+
+        return {
+          id: block.id || uid8(),
+          type: 'file',
+          visible: block.visible !== false,
+          wrap: block.wrap !== false,
+          heightEnabled: block.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3)),
+          fileName: String(block.fileName || block.title || 'ファイル').trim() || 'ファイル',
+          previewEnabled: block.previewEnabled !== false,
+          fileMode: block.fileMode === 'upload' ? 'upload' : 'paste',
+          fileText: block.fileMode === 'upload' ? (block.fileText || '') : raw,
+          fileDataUrl: block.fileMode === 'upload' ? String(block.fileDataUrl || '') : '',
+          fileMime: String(block.fileMime || ''),
+          fileOriginalName: String(block.fileOriginalName || block.fileName || 'file'),
+          fileDetectedKind: detected.kind
+        };
+      }
 
       return {
         id: block.id || uid8(),
-        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
-        html,
+        type: 'text',
+        source: typeof block.source === 'string'
+          ? block.source
+          : htmlToPlainText(block.html || ''),
+        html: typeof block.html === 'string' && block.html.trim()
+          ? sanitizeRichHtml(block.html)
+          : parseTextSource(block.source || htmlToPlainText(block.html || '')),
         visible: block.visible !== false,
         wrap: block.wrap !== false,
         heightEnabled: block.heightEnabled === true,
@@ -893,7 +1151,7 @@
         ownerUid: data.ownerUid || '',
         creatorId: data.creatorId || creatorId(),
         collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
-        blocks: Array.isArray(data.blocks) ? data.blocks : [],
+        blocks: Array.isArray(data.blocks) ? data.blocks.map(normalizeBlock) : [],
         isPublic: data.isPublic !== false,
         collaborative: Boolean(data.collaborative || data.key),
         createdAt: data.createdAt || Date.now(),
@@ -935,7 +1193,10 @@
     function siteSearchText(site) {
       const blockText = (site.blocks || [])
         .filter((b) => b.visible !== false)
-        .map((b) => String(b.html || '').replace(/<[^>]+>/g, ' '))
+        .map((b) => {
+          if (b.type === 'file') return `${b.fileName || ''} ${b.fileText || b.fileOriginalName || ''}`;
+          return String(b.source || b.html || '').replace(/<[^>]+>/g, ' ');
+        })
         .join(' ');
       return `${site.title || ''} ${blockText}`.toLowerCase();
     }
@@ -1001,6 +1262,76 @@
       `;
     }
 
+    function renderTextBlockHtml(block) {
+      const source = String(block.source || '');
+      return `<div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}" style="${blockHeightStyle(block)}">${parseTextSource(source)}</div>`;
+    }
+
+    function fileInlineContentHtml(block) {
+      const label = esc(block.fileName || 'ファイル');
+      const detected = block.fileMode === 'upload'
+        ? {
+            kind: 'upload',
+            text: block.fileText || '',
+            originalName: block.fileOriginalName || block.fileName || 'file',
+            mime: block.fileMime || '',
+            dataUrl: block.fileDataUrl || ''
+          }
+        : detectFileSource(block.fileText || '');
+
+      if (detected.kind === 'html') {
+        return `<div class="file-preview-mini">${detected.html}</div>`;
+      }
+      if (detected.kind === 'url') {
+        const url = esc(detected.url);
+        return `
+          <div class="file-preview-mini">
+            <div class="file-badge">📎 ${label}</div>
+            <div style="margin-top:10px"><a class="file-link" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></div>
+          </div>
+        `;
+      }
+      if (detected.kind === 'upload') {
+        if ((detected.mime || '').startsWith('image/') && detected.dataUrl) {
+          return `<div class="file-preview-mini"><img src="${esc(detected.dataUrl)}" alt="${label}"></div>`;
+        }
+        if ((detected.mime || '').startsWith('text/') && detected.text) {
+          return `<div class="file-preview-mini"><div style="white-space:pre-wrap;line-height:1.8">${esc(detected.text)}</div></div>`;
+        }
+        if (detected.dataUrl) {
+          return `<div class="file-preview-mini"><div class="empty" style="padding:18px 10px">このファイルはクリックで開けます。</div></div>`;
+        }
+      }
+      return `<div class="file-preview-mini"><div style="white-space:pre-wrap;line-height:1.8">${esc(detected.text || '')}</div></div>`;
+    }
+
+    function renderFileBlockHtml(block, index) {
+      const actionLabel = block.previewEnabled ? 'プレビュー' : 'ダウンロード';
+      const sourceBadge = block.fileDetectedKind === 'html'
+        ? 'HTML'
+        : block.fileDetectedKind === 'url'
+          ? 'URL'
+          : block.fileMode === 'upload'
+            ? 'FILE'
+            : 'TEXT';
+
+      return `
+        <article class="block ${block.visible === false ? 'hidden-block' : ''}" style="${blockHeightStyle(block)}" data-editor-block-card="${esc(block.id)}">
+          <div class="block-head">
+            <div style="color:var(--muted);font-weight:900">ブロック ${index + 1} / ファイル</div>
+            <button class="btn small" data-block-action="settings" data-block-id="${esc(block.id)}" type="button">⚙️</button>
+          </div>
+          <div class="file-block-shell">
+            <div class="file-badge">📎 ${esc(block.fileName || 'ファイル')} <span class="status-pill">${sourceBadge}</span></div>
+            <div class="file-preview-mini">${fileInlineContentHtml(block)}</div>
+            <div class="toolbar">
+              <button class="btn primary" type="button" data-file-open="${esc(block.id)}">${actionLabel}</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
     function drawHomeScreen() {
       const mine = filterSites(mineSites(), state.homeSearch);
       const pub = filterSites(publicSites(), state.homeSearch);
@@ -1053,11 +1384,14 @@
       const site = state.current;
       const blocks = (site?.blocks || [])
         .filter((block) => block.visible !== false)
-        .map((block) => `
-          <article class="block" style="${blockHeightStyle(block)}">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
-          </article>
-        `).join('');
+        .map((block, index) => {
+          if (block.type === 'file') return renderFileBlockHtml(block, index);
+          return `
+            <article class="block" style="${blockHeightStyle(block)}">
+              <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
+            </article>
+          `;
+        }).join('');
 
       const statusHtml = canEditCurrent()
         ? `<span class="status-pill good">${state.currentAccess === 'key' ? '共同編集モード' : '編集可能'}</span>`
@@ -1088,6 +1422,33 @@
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
+
+        if (normalized.type === 'file') {
+          const actionLabel = normalized.previewEnabled ? 'プレビュー' : 'ダウンロード';
+          const sourceBadge = normalized.fileDetectedKind === 'html'
+            ? 'HTML'
+            : normalized.fileDetectedKind === 'url'
+              ? 'URL'
+              : normalized.fileMode === 'upload'
+                ? 'FILE'
+                : 'TEXT';
+          return `
+            <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}">
+              <div class="block-head">
+                <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
+                <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
+              </div>
+              <div class="file-block-shell">
+                <div class="file-badge">📎 ${esc(normalized.fileName || 'ファイル')} <span class="status-pill">${sourceBadge}</span></div>
+                <div class="file-preview-mini">${fileInlineContentHtml(normalized)}</div>
+                <div class="toolbar">
+                  <button class="btn primary" type="button" data-file-open="${esc(normalized.id)}">${actionLabel}</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }
+
         const preview = normalized.visible
           ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
@@ -1136,7 +1497,7 @@
         </div>
 
         <div class="bottom-add-bar" id="bottomAddBar">
-          <button class="add-block-btn" id="addBlockBtn" type="button" style="${addBlockButtonStyle()}">＋ 追加</button>
+          <button class="add-block-btn" id="addBlockBtn" type="button" style="${addBarButtonStyle()}">＋ 追加</button>
         </div>
       `;
     }
@@ -1180,7 +1541,7 @@
     }
 
     function setCurrentSite(site, saved = true) {
-      state.current = site ? structuredClone(normalizeSite(site.siteId, site)) : null;
+      state.current = site ? deepClone(normalizeSite(site.siteId, site)) : null;
       if (state.current) {
         state.current.blocks = (state.current.blocks || []).map(normalizeBlock);
       }
@@ -1198,7 +1559,16 @@
         creatorId: creatorId(),
         key: '',
         blocks: [
-          { id: uid8(), source: "こんにちは\n太字も使えるよ\n#ff0000赤文字", html: "こんにちは<br>太字も使えるよ<br><span style=\"color:#ff0000\">赤文字</span>", visible: true, wrap: true, heightEnabled: false, rows: 3 }
+          {
+            id: uid8(),
+            type: 'text',
+            source: "こんにちは\nfile(あ)'こちら' をタップするとファイルが開けるよ\n#ff0000赤文字",
+            html: parseTextSource("こんにちは\nfile(あ)'こちら' をタップするとファイルが開けるよ\n#ff0000赤文字"),
+            visible: true,
+            wrap: true,
+            heightEnabled: false,
+            rows: 3
+          }
         ],
         isPublic: true,
         collaborative: false,
@@ -1221,7 +1591,7 @@
       state.mode = 'editor';
       renderApp();
       if (sync) syncCurrentUrl();
-      focusEditingBlockIfNeeded();
+      focusBlockByIdIfNeeded();
     }
 
     function openViewerScreen(site, access = 'view', sync = true) {
@@ -1232,7 +1602,7 @@
       if (sync) syncCurrentUrl();
     }
 
-    function focusEditingBlockIfNeeded() {
+    function focusBlockByIdIfNeeded() {
       if (!state.editingBlockId) return;
       const el = appRoot.querySelector(`[data-editor-block="${CSS.escape(state.editingBlockId)}"]`);
       if (!el) return;
@@ -1258,11 +1628,29 @@
       state.pendingBlockSettingsId = blockId;
       const target = blockId ? state.current.blocks.find((b) => b.id === blockId) : null;
       if (!target) return;
+
       blockVisibleToggle.checked = target.visible !== false;
       blockWrapToggle.checked = target.wrap !== false;
       blockHeightToggle.checked = target.heightEnabled === true;
       blockRowsInput.value = String(Math.max(1, Math.min(50, Number(target.rows || 3) || 3)));
       blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
+
+      if (target.type === 'file') {
+        textBlockFields.classList.add('hidden');
+        fileBlockFields.classList.remove('hidden');
+        fileNameInput.value = target.fileName || 'ファイル';
+        filePreviewToggle.checked = target.previewEnabled !== false;
+        fileSourceInput.value = target.fileMode === 'upload'
+          ? (target.fileText || '')
+          : (target.fileText || '');
+        fileBlockSourceKindPill.textContent = target.fileMode === 'upload'
+          ? `UPLOAD ${target.fileMime ? `・${target.fileMime}` : ''}`
+          : (detectFileSource(target.fileText || '').kind.toUpperCase());
+      } else {
+        textBlockFields.classList.remove('hidden');
+        fileBlockFields.classList.add('hidden');
+      }
+
       if (!blockSettingsDialog.open) blockSettingsDialog.showModal();
     }
 
@@ -1351,7 +1739,7 @@
       state.current = {
         siteId: 'missing',
         title: 'サイトが見つかりません',
-        blocks: [{ id: 'missing', source: '', html: message || 'このリンクのサイトは見つかりませんでした。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
+        blocks: [{ id: 'missing', type: 'text', source: '', html: message || 'このリンクのサイトは見つかりませんでした。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
       };
       state.currentSaved = true;
       state.mode = 'missing';
@@ -1362,16 +1750,20 @@
       state.current = {
         siteId: 'denied',
         title: 'アクセスできません',
-        blocks: [{ id: 'denied', source: '', html: 'このサイトは非公開です。正しい閲覧リンクか共同編集Keyが必要です。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
+        blocks: [{ id: 'denied', type: 'text', source: '', html: 'このサイトは非公開です。正しい閲覧リンクか共同編集Keyが必要です。', visible: true, wrap: true, heightEnabled: false, rows: 3 }]
       };
       state.currentSaved = true;
       state.mode = 'denied';
       renderApp();
     }
 
+    function closeDialog(dialogEl) {
+      if (dialogEl && dialogEl.open) dialogEl.close();
+    }
+
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      if (homeSettingsDialog.open) homeSettingsDialog.close();
+      closeDialog(homeSettingsDialog);
       if (state.mode === 'editor') renderApp();
     }
 
@@ -1391,7 +1783,7 @@
       }, { merge: true });
 
       await loadAllSites();
-      if (siteSettingsDialog.open) siteSettingsDialog.close();
+      closeDialog(siteSettingsDialog);
       renderApp();
       syncCurrentUrl();
     }
@@ -1440,22 +1832,54 @@
       target.wrap = !!blockWrapToggle.checked;
       target.heightEnabled = !!blockHeightToggle.checked;
       target.rows = target.heightEnabled ? Math.max(1, Math.min(50, Number(blockRowsInput.value || 3) || 3)) : (target.rows || 3);
+
+      if (target.type === 'file') {
+        target.fileName = String(fileNameInput.value || 'ファイル').trim() || 'ファイル';
+        target.previewEnabled = !!filePreviewToggle.checked;
+        target.fileText = String(fileSourceInput.value || '');
+        target.fileMode = target.fileDataUrl ? 'upload' : 'paste';
+        target.fileDetectedKind = target.fileMode === 'upload'
+          ? 'upload'
+          : detectFileSource(target.fileText || '').kind;
+      }
+
       state.current.updatedAt = Date.now();
 
       setDoc(doc(state.db, COLLECTION, state.current.siteId), {
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((b) => {
+          if (b.type === 'file') {
+            return {
+              id: b.id,
+              type: 'file',
+              visible: b.visible !== false,
+              wrap: b.wrap !== false,
+              heightEnabled: b.heightEnabled === true,
+              rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3)),
+              fileName: b.fileName || 'ファイル',
+              previewEnabled: b.previewEnabled !== false,
+              fileMode: b.fileMode === 'upload' ? 'upload' : 'paste',
+              fileText: b.fileText || '',
+              fileDataUrl: b.fileDataUrl || '',
+              fileMime: b.fileMime || '',
+              fileOriginalName: b.fileOriginalName || b.fileName || 'file',
+              fileDetectedKind: b.fileDetectedKind || detectFileSource(b.fileText || '').kind
+            };
+          }
+          return {
+            id: b.id,
+            type: 'text',
+            source: b.source || htmlToPlainText(b.html || ''),
+            html: b.html || parseTextSource(b.source || ''),
+            visible: b.visible !== false,
+            wrap: b.wrap !== false,
+            heightEnabled: b.heightEnabled === true,
+            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+          };
+        }),
         updatedAt: state.current.updatedAt
       }, { merge: true }).then(async () => {
         await loadAllSites();
-        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        closeDialog(blockSettingsDialog);
         state.pendingBlockSettingsId = null;
         renderApp();
       });
@@ -1486,7 +1910,7 @@
         setCreatorId(target);
         await loadAllSites();
         renderApp();
-        if (mergeDialog.open) mergeDialog.close();
+        closeDialog(mergeDialog);
         return;
       }
 
@@ -1502,7 +1926,7 @@
 
       await loadAllSites();
       renderApp();
-      if (mergeDialog.open) mergeDialog.close();
+      closeDialog(mergeDialog);
       alert('IDを統合しました。');
     }
 
@@ -1523,15 +1947,36 @@
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((b) => {
+          if (b.type === 'file') {
+            return {
+              id: b.id,
+              type: 'file',
+              visible: b.visible !== false,
+              wrap: b.wrap !== false,
+              heightEnabled: b.heightEnabled === true,
+              rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3)),
+              fileName: b.fileName || 'ファイル',
+              previewEnabled: b.previewEnabled !== false,
+              fileMode: b.fileMode === 'upload' ? 'upload' : 'paste',
+              fileText: b.fileText || '',
+              fileDataUrl: b.fileDataUrl || '',
+              fileMime: b.fileMime || '',
+              fileOriginalName: b.fileOriginalName || b.fileName || 'file',
+              fileDetectedKind: b.fileDetectedKind || detectFileSource(b.fileText || '').kind
+            };
+          }
+          return {
+            id: b.id,
+            type: 'text',
+            source: b.source || htmlToPlainText(b.html || ''),
+            html: b.html || parseTextSource(b.source || ''),
+            visible: b.visible !== false,
+            wrap: b.wrap !== false,
+            heightEnabled: b.heightEnabled === true,
+            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+          };
+        }),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1636,12 +2081,13 @@
       });
     }
 
-    function addNewBlock() {
+    function addNewTextBlock() {
       if (!state.current) return;
       const block = normalizeBlock({
         id: uid8(),
+        type: 'text',
         source: '',
-        html: '',
+        html: '<br>',
         visible: true,
         wrap: true,
         heightEnabled: false,
@@ -1654,18 +2100,38 @@
       focusBlockEditor(block.id);
     }
 
+    function addNewFileBlock() {
+      if (!state.current) return;
+      const block = normalizeBlock({
+        id: uid8(),
+        type: 'file',
+        fileName: 'ファイル',
+        previewEnabled: true,
+        fileMode: 'paste',
+        fileText: '',
+        fileDataUrl: '',
+        fileMime: '',
+        fileOriginalName: '',
+        visible: true,
+        wrap: true,
+        heightEnabled: false,
+        rows: 3
+      });
+      state.current.blocks.push(block);
+      state.currentSaved = false;
+      renderApp();
+      openBlockSettingsModal(block.id);
+    }
+
     function updateEditableBlockFromDom(blockId, element) {
       if (!state.current || !blockId || !element) return;
       const idx = state.current.blocks.findIndex((b) => b.id === blockId);
       if (idx < 0) return;
-
       const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw);
-
+      const html = parseTextSource(raw);
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html || '<br>';
       state.currentSaved = false;
-
       const selectionKeep = document.activeElement === element;
       const nextHtml = html || '<br>';
       if (element.innerHTML !== nextHtml) {
@@ -1674,11 +2140,195 @@
       }
     }
 
+    function openFilePreview(blockId) {
+      if (!state.current) return;
+      const block = state.current.blocks.find((b) => b.id === blockId);
+      if (!block || block.type !== 'file') return;
+      state.pendingFilePreview = deepClone(block);
+      filePreviewTitle.textContent = block.fileName || 'ファイル';
+      filePreviewMeta.textContent = block.fileMode === 'upload'
+        ? `アップロード / ${block.fileOriginalName || 'file'}${block.fileMime ? ` / ${block.fileMime}` : ''}`
+        : `貼り付け / ${block.fileDetectedKind || detectFileSource(block.fileText || '').kind}`;
+      filePreviewContent.innerHTML = buildFilePreviewHtml(block);
+      filePreviewDownloadBtn.onclick = () => downloadFileBlock(block);
+      if (!filePreviewDialog.open) filePreviewDialog.showModal();
+    }
+
+    function buildFilePreviewHtml(block) {
+      const name = esc(block.fileName || 'ファイル');
+      if (block.fileMode === 'upload') {
+        if ((block.fileMime || '').startsWith('image/') && block.fileDataUrl) {
+          return `<img src="${esc(block.fileDataUrl)}" alt="${name}">`;
+        }
+        if ((block.fileMime || '').startsWith('text/') && block.fileText) {
+          return `<div style="white-space:pre-wrap;line-height:1.8">${esc(block.fileText)}</div>`;
+        }
+        if ((block.fileMime || '') === 'application/pdf' && block.fileDataUrl) {
+          return `<iframe src="${esc(block.fileDataUrl)}"></iframe>`;
+        }
+        if (block.fileDataUrl) {
+          return `
+            <div class="empty" style="padding:28px 10px">
+              このファイルはそのままの表示には向いていません。<br>ダウンロードボタンから開けます。
+            </div>
+          `;
+        }
+      }
+
+      const detected = detectFileSource(block.fileText || '');
+      if (detected.kind === 'html') return `<div>${detected.html}</div>`;
+      if (detected.kind === 'url') {
+        const url = esc(detected.url);
+        return `<div class="file-preview-mini"><a class="file-link" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></div>`;
+      }
+      return `<div style="white-space:pre-wrap;line-height:1.8">${esc(detected.text || '')}</div>`;
+    }
+
+    function downloadBlobFromText(text, filename, type = 'text/plain;charset=utf-8') {
+      const blob = new Blob([text], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function downloadDataUrl(dataUrl, filename) {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function downloadFileBlock(block) {
+      const filename = (block.fileName || block.fileOriginalName || 'file').trim() || 'file';
+      if (block.fileMode === 'upload' && block.fileDataUrl) {
+        downloadDataUrl(block.fileDataUrl, filename);
+        return;
+      }
+
+      const detected = detectFileSource(block.fileText || '');
+      if (detected.kind === 'html') {
+        downloadBlobFromText(detected.html, filename.endsWith('.html') ? filename : `${filename}.html`, 'text/html;charset=utf-8');
+        return;
+      }
+      if (detected.kind === 'url') {
+        downloadBlobFromText(detected.url, filename.endsWith('.txt') ? filename : `${filename}.txt`);
+        return;
+      }
+      downloadBlobFromText(detected.text || '', filename.endsWith('.txt') ? filename : `${filename}.txt`);
+    }
+
+    async function readFileAsDataUrl(file) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('読み込み失敗'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function readFileAsText(file) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('読み込み失敗'));
+        reader.readAsText(file);
+      });
+    }
+
+    async function applyUploadedFileToCurrentBlock(file) {
+      if (!state.current || !state.pendingBlockSettingsId) return;
+      const target = state.current.blocks.find((b) => b.id === state.pendingBlockSettingsId);
+      if (!target || target.type !== 'file') return;
+
+      target.fileOriginalName = file.name || 'file';
+      target.fileName = String(file.name || 'ファイル').trim() || 'ファイル';
+      target.fileMime = file.type || '';
+      target.fileMode = 'upload';
+      target.previewEnabled = true;
+
+      if ((file.type || '').startsWith('text/') || /\.(txt|html?|json|csv|md|xml|svg|js|css|ts|jsx|tsx)$/i.test(file.name || '')) {
+        target.fileText = await readFileAsText(file);
+        target.fileDataUrl = '';
+        target.fileDetectedKind = detectFileSource(target.fileText || '').kind;
+      } else {
+        target.fileDataUrl = await readFileAsDataUrl(file);
+        target.fileText = '';
+        target.fileDetectedKind = 'upload';
+      }
+
+      fileNameInput.value = target.fileName;
+      filePreviewToggle.checked = true;
+      fileSourceInput.value = target.fileText || '';
+      fileBlockSourceKindPill.textContent = target.fileDetectedKind.toUpperCase();
+      state.currentSaved = false;
+      renderApp();
+      openBlockSettingsModal(target.id);
+    }
+
+    async function pasteClipboardIntoFileBlock() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!state.current || !state.pendingBlockSettingsId) return;
+        const target = state.current.blocks.find((b) => b.id === state.pendingBlockSettingsId);
+        if (!target || target.type !== 'file') return;
+        target.fileMode = 'paste';
+        target.fileText = text || '';
+        target.fileDataUrl = '';
+        target.fileMime = '';
+        target.fileDetectedKind = detectFileSource(text || '').kind;
+        fileSourceInput.value = target.fileText;
+        fileBlockSourceKindPill.textContent = target.fileDetectedKind.toUpperCase();
+        state.currentSaved = false;
+        renderApp();
+        openBlockSettingsModal(target.id);
+      } catch (error) {
+        console.error(error);
+        alert('クリップボードを読めなかったよ。ブラウザの許可を確認してね。');
+      }
+    }
+
+    function syncFileBlockKindPill() {
+      const raw = String(fileSourceInput.value || '');
+      const detected = detectFileSource(raw);
+      fileBlockSourceKindPill.textContent = detected.kind.toUpperCase();
+    }
+
     function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
         if (siteId) openSiteById(siteId, null, true);
+        return;
+      }
+
+      const fileOpenBtn = target.closest('[data-file-open]');
+      if (fileOpenBtn) {
+        const blockId = fileOpenBtn.getAttribute('data-file-open');
+        if (!blockId || !state.current) return;
+        const block = state.current.blocks.find((b) => b.id === blockId);
+        if (!block || block.type !== 'file') return;
+        if (block.previewEnabled) openFilePreview(blockId);
+        else downloadFileBlock(block);
+        return;
+      }
+
+      const inlineFileLink = target.closest('[data-file-ref]');
+      if (inlineFileLink && state.current) {
+        const refName = String(inlineFileLink.getAttribute('data-file-ref') || '').trim();
+        const block = state.current.blocks.find((b) => b.type === 'file' && String(b.fileName || '').trim() === refName);
+        if (!block) {
+          alert(`ファイル「${refName}」が見つからないよ`);
+          return;
+        }
+        if (block.previewEnabled) openFilePreview(block.id);
+        else downloadFileBlock(block);
         return;
       }
 
@@ -1793,12 +2443,29 @@
       }
 
       if (target.closest('#addBlockBtn')) {
-        addNewBlock();
+        if (!addMenuDialog.open) addMenuDialog.showModal();
+        return;
+      }
+
+      if (target.closest('#closeAddMenuBtn')) {
+        closeDialog(addMenuDialog);
+        return;
+      }
+
+      if (target.closest('#addTextBlockBtn')) {
+        closeDialog(addMenuDialog);
+        addNewTextBlock();
+        return;
+      }
+
+      if (target.closest('#addFileBlockBtn')) {
+        closeDialog(addMenuDialog);
+        addNewFileBlock();
         return;
       }
 
       if (target.closest('#siteSettingsCancelBtn')) {
-        if (siteSettingsDialog.open) siteSettingsDialog.close();
+        closeDialog(siteSettingsDialog);
         return;
       }
 
@@ -1818,7 +2485,7 @@
       }
 
       if (target.closest('#blockSettingsCancelBtn')) {
-        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        closeDialog(blockSettingsDialog);
         state.pendingBlockSettingsId = null;
         return;
       }
@@ -1829,7 +2496,7 @@
       }
 
       if (target.closest('#homeSettingsCloseBtn')) {
-        if (homeSettingsDialog.open) homeSettingsDialog.close();
+        closeDialog(homeSettingsDialog);
         return;
       }
 
@@ -1839,7 +2506,7 @@
       }
 
       if (target.closest('#closeIdBtn')) {
-        if (idDialog.open) idDialog.close();
+        closeDialog(idDialog);
         return;
       }
 
@@ -1849,7 +2516,7 @@
       }
 
       if (target.closest('#mergeCancelBtn')) {
-        if (mergeDialog.open) mergeDialog.close();
+        closeDialog(mergeDialog);
         return;
       }
 
@@ -1859,7 +2526,7 @@
       }
 
       if (target.closest('#closeShareBtn')) {
-        if (shareDialog.open) shareDialog.close();
+        closeDialog(shareDialog);
         return;
       }
 
@@ -1905,6 +2572,27 @@
 
       if (target.closest('#homeRefreshBtn')) {
         reloadHomeSites();
+        return;
+      }
+
+      if (target.closest('#fileUploadBtn')) {
+        fileUploadInput.click();
+        return;
+      }
+
+      if (target.closest('#filePasteBtn')) {
+        pasteClipboardIntoFileBlock();
+        return;
+      }
+
+      if (target.closest('#closeFilePreviewBtn')) {
+        closeDialog(filePreviewDialog);
+        return;
+      }
+
+      if (target.closest('#filePreviewDownloadBtn')) {
+        if (state.pendingFilePreview) downloadFileBlock(state.pendingFilePreview);
+        return;
       }
     }
 
@@ -1949,7 +2637,30 @@
         return;
       }
 
-      if (target.id === 'blockRowsInput') {
+      if (target.id === 'fileSourceInput') {
+        syncFileBlockKindPill();
+        return;
+      }
+
+      if (target.id === 'fileNameInput' && state.current) {
+        state.currentSaved = false;
+        return;
+      }
+
+      if (target.id === 'filePreviewToggle' && state.current) {
+        state.currentSaved = false;
+        return;
+      }
+
+      if (target.id === 'fileUploadInput') {
+        const file = target.files && target.files[0];
+        if (file) {
+          applyUploadedFileToCurrentBlock(file).catch((error) => {
+            console.error(error);
+            alert('ファイルの読み込みに失敗したよ。');
+          });
+          target.value = '';
+        }
         return;
       }
 
@@ -1985,18 +2696,33 @@
         state.moveBlockId = null;
         renderApp();
       }
+      if (event.key === 'Escape' && addMenuDialog.open) {
+        closeDialog(addMenuDialog);
+      }
     }
 
     blockSettingsDialog.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (blockSettingsDialog.open) blockSettingsDialog.close();
+        closeDialog(blockSettingsDialog);
         state.pendingBlockSettingsId = null;
       }
     });
 
     homeSettingsDialog.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (homeSettingsDialog.open) homeSettingsDialog.close();
+        closeDialog(homeSettingsDialog);
+      }
+    });
+
+    filePreviewDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDialog(filePreviewDialog);
+      }
+    });
+
+    addMenuDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDialog(addMenuDialog);
       }
     });
 
