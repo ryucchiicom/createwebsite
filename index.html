@@ -2009,6 +2009,27 @@ dialog::backdrop{
       }
     });
 
+    const colorSchemeMedia = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const handleColorSchemeChange = () => {
+      if (state.mode !== 'loading') {
+        renderApp();
+      }
+      if (shareDialog.open) {
+        syncShareDialog();
+      }
+      if (homeSettingsDialog.open) {
+        updateAddBarOpacityLabel();
+      }
+    };
+
+    if (colorSchemeMedia) {
+      if (typeof colorSchemeMedia.addEventListener === 'function') {
+        colorSchemeMedia.addEventListener('change', handleColorSchemeChange);
+      } else if (typeof colorSchemeMedia.addListener === 'function') {
+        colorSchemeMedia.addListener(handleColorSchemeChange);
+      }
+    }
+
     window.addEventListener('hashchange', async () => {
       const route = parseRoute();
       if (!state.ready) return;
