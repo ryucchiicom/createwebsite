@@ -1104,8 +1104,9 @@ dialog::backdrop{
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
+        const editorText = normalized.source || htmlToPlainText(normalized.html || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${normalized.html || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${esc(editorText)}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1459,15 +1460,18 @@ dialog::backdrop{
       state.current.updatedAt = Date.now();
 
       setDoc(doc(state.db, COLLECTION, state.current.siteId), {
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((b) => {
+          const source = String(b.source || htmlToPlainText(b.html || ''));
+          return {
+            id: b.id,
+            source,
+            html: parseStyledSource(source) || '<br>',
+            visible: b.visible !== false,
+            wrap: b.wrap !== false,
+            heightEnabled: b.heightEnabled === true,
+            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+          };
+        }),
         updatedAt: state.current.updatedAt
       }, { merge: true }).then(async () => {
         await loadAllSites();
@@ -1556,7 +1560,10 @@ dialog::backdrop{
 
       state.currentSaved = true;
       state.current = normalizeSite(state.current.siteId, payload);
-      state.current.blocks = state.current.blocks.map(normalizeBlock);
+      state.current.blocks = state.current.blocks.map((block) => ({
+        ...normalizeBlock(block),
+        source: String(block.source || htmlToPlainText(block.html || ''))
+      }));
       await loadAllSites();
       state.mode = 'editor';
       renderApp();
@@ -1676,10 +1683,9 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw);
 
       state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = html || '<br>';
+      state.current.blocks[idx].html = parseStyledSource(raw) || '<br>';
       state.currentSaved = false;
     }
 
