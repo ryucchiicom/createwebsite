@@ -28,7 +28,7 @@
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
-```
+
 @media (prefers-color-scheme: dark){
   :root{
     --bg:#0b1220;
@@ -443,7 +443,7 @@ dialog::backdrop{
     right:12px;
   }
 }
-```
+
 
   </style>
 </head>
@@ -455,7 +455,7 @@ dialog::backdrop{
       <h2>画面設定</h2>
       <p>下の「＋ 追加」バーの透過度を変えられます。今後ここに設定を増やしていけます。</p>
 
-```
+
   <div class="field">
     <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
@@ -465,7 +465,7 @@ dialog::backdrop{
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
 </div>
-```
+
 
   </dialog>
 
@@ -474,7 +474,7 @@ dialog::backdrop{
       <h2>設定</h2>
       <p>ここでは公開範囲や共同編集Keyをまとめて管理できます。</p>
 
-```
+
   <div class="field">
     <label>
       <input id="sitePublicToggle" type="checkbox" />
@@ -497,7 +497,7 @@ dialog::backdrop{
     <button class="btn primary" id="siteSettingsSaveBtn" type="button">保存して閉じる</button>
   </div>
 </div>
-```
+
 
   </dialog>
 
@@ -506,7 +506,7 @@ dialog::backdrop{
       <h2>ブロック設定</h2>
       <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
 
-```
+
   <div class="field">
     <label>
       <input id="blockVisibleToggle" type="checkbox" />
@@ -538,7 +538,7 @@ dialog::backdrop{
     <button class="btn primary" id="blockSettingsSaveBtn" type="button">保存して閉じる</button>
   </div>
 </div>
-```
+
 
   </dialog>
 
@@ -547,7 +547,7 @@ dialog::backdrop{
       <h2>ID統合</h2>
       <p>現在の自分の表示IDを、別のIDにまとめます。今のサイト一覧表示もそのIDへ移ります。</p>
 
-```
+
   <div class="field">
     <label for="mergeTargetInput">統合先ID</label>
     <input id="mergeTargetInput" placeholder="例：abcd1234" />
@@ -558,7 +558,7 @@ dialog::backdrop{
     <button class="btn danger" id="mergeExecuteBtn" type="button">実行</button>
   </div>
 </div>
-```
+
 
   </dialog>
 
@@ -2008,27 +2008,6 @@ dialog::backdrop{
         if (homeSettingsDialog.open) homeSettingsDialog.close();
       }
     });
-
-    const colorSchemeMedia = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-    const handleColorSchemeChange = () => {
-      if (state.mode !== 'loading') {
-        renderApp();
-      }
-      if (shareDialog.open) {
-        syncShareDialog();
-      }
-      if (homeSettingsDialog.open) {
-        updateAddBarOpacityLabel();
-      }
-    };
-
-    if (colorSchemeMedia) {
-      if (typeof colorSchemeMedia.addEventListener === 'function') {
-        colorSchemeMedia.addEventListener('change', handleColorSchemeChange);
-      } else if (typeof colorSchemeMedia.addListener === 'function') {
-        colorSchemeMedia.addListener(handleColorSchemeChange);
-      }
-    }
 
     window.addEventListener('hashchange', async () => {
       const route = parseRoute();
