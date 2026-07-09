@@ -715,7 +715,7 @@ dialog::backdrop{
 
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      const colorMatch = text.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
@@ -776,7 +776,7 @@ dialog::backdrop{
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/);
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
           color = `#${colorMatch[1]}`;
           reopen();
