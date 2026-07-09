@@ -185,9 +185,6 @@ p{color:var(--muted);line-height:1.8}
   border-radius:18px;
   padding:14px;
   margin-bottom:12px;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
 }
 .block.hidden-block{
   opacity:.55;
@@ -214,9 +211,11 @@ p{color:var(--muted);line-height:1.8}
   line-height:1.8;
   word-break:break-word;
   max-width:100%;
-  min-height:0;
+}
+.rendered-text[style*="height:"],
+.editor-text[style*="height:"]{
   overflow:auto;
-  flex:1 1 auto;
+  -webkit-overflow-scrolling:touch;
 }
 .rendered-text.no-wrap{
   white-space:nowrap;
@@ -227,7 +226,7 @@ p{color:var(--muted);line-height:1.8}
 }
 
 .editor-text{
-  min-height:0;
+  min-height:44px;
   outline:none;
   white-space:pre-wrap;
   line-height:1.8;
@@ -238,8 +237,6 @@ p{color:var(--muted);line-height:1.8}
   -webkit-touch-callout:none;
   touch-action:manipulation;
   padding:2px 0;
-  overflow:auto;
-  flex:1 1 auto;
 }
 .editor-text:focus{outline:none}
 
@@ -512,7 +509,7 @@ dialog::backdrop{
   <dialog id="blockSettingsDialog">
     <div class="dialog-body">
       <h2>ブロック設定</h2>
-      <p>表示するブロックの縦の大きさを調整できます。長い文章はブロック内でスクロールして読めます。</p>
+      <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
 
 
   <div class="field">
@@ -537,7 +534,7 @@ dialog::backdrop{
   </div>
 
   <div class="field hidden" id="blockRowsField">
-    <label for="blockRowsInput">高さの目安（行数）</label>
+    <label for="blockRowsInput">行数</label>
     <input id="blockRowsInput" type="number" min="1" max="50" step="1" />
   </div>
 
@@ -929,7 +926,11 @@ dialog::backdrop{
     function blockHeightStyle(block) {
       if (!block.heightEnabled) return '';
       const rows = Math.max(1, Math.min(50, Number(block.rows || 3) || 3));
-      return `height: calc(${rows} * 1.8em + 84px); overflow:hidden;`;
+      return `height: calc(${rows} * 1.8em + 28px); overflow:auto; -webkit-overflow-scrolling:touch;`;
+    }
+
+    function blockContentStyle(block) {
+      return block.heightEnabled ? 'display:block;' : '';
     }
 
     function isMine(site) {
@@ -1079,8 +1080,8 @@ dialog::backdrop{
       const blocks = (site?.blocks || [])
         .filter((block) => block.visible !== false)
         .map((block) => `
-          <article class="block" style="${blockHeightStyle(block)}">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}">${block.html || ''}</div>
+          <article class="block">
+            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}" style="${blockHeightStyle(block)}">${block.html || ''}</div>
           </article>
         `).join('');
 
@@ -1115,11 +1116,11 @@ dialog::backdrop{
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}">${editorHtml || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}${blockContentStyle(normalized)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
-          <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">
+          <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}">
             <div class="block-head">
               <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
               <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
