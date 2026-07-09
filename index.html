@@ -715,12 +715,12 @@ dialog::backdrop{
 
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])$/);
+      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = text.match(/^S(\d{1,3})$/);
+      const sizeMatch = text.match(/^S(\d{1,3})'$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
       }
@@ -730,11 +730,12 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
+      const apostrophe = '&#39;';
       if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}"></span>`;
+        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
       }
       if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px"></span>`;
+        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
       }
       return '';
     }
@@ -1104,9 +1105,9 @@ dialog::backdrop{
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
-        const editorText = normalized.source || htmlToPlainText(normalized.html || '');
+        const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${esc(editorText)}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1683,9 +1684,20 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
+      const standaloneCommand = getStandaloneStyleCommand(raw);
 
-      state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = parseStyledSource(raw) || '<br>';
+      if (standaloneCommand) {
+        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
+        element.blur?.();
+        const selection = window.getSelection?.();
+        if (selection) selection.removeAllRanges();
+      }
+
+      const visibleText = element.innerText.replace(/\r/g, '');
+      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
+
+      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
 
