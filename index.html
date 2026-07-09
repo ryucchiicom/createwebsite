@@ -185,6 +185,9 @@ p{color:var(--muted);line-height:1.8}
   border-radius:18px;
   padding:14px;
   margin-bottom:12px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
 }
 .block.hidden-block{
   opacity:.55;
@@ -211,6 +214,9 @@ p{color:var(--muted);line-height:1.8}
   line-height:1.8;
   word-break:break-word;
   max-width:100%;
+  min-height:0;
+  overflow:auto;
+  flex:1 1 auto;
 }
 .rendered-text.no-wrap{
   white-space:nowrap;
@@ -221,7 +227,7 @@ p{color:var(--muted);line-height:1.8}
 }
 
 .editor-text{
-  min-height:44px;
+  min-height:0;
   outline:none;
   white-space:pre-wrap;
   line-height:1.8;
@@ -232,6 +238,8 @@ p{color:var(--muted);line-height:1.8}
   -webkit-touch-callout:none;
   touch-action:manipulation;
   padding:2px 0;
+  overflow:auto;
+  flex:1 1 auto;
 }
 .editor-text:focus{outline:none}
 
@@ -504,7 +512,7 @@ dialog::backdrop{
   <dialog id="blockSettingsDialog">
     <div class="dialog-body">
       <h2>ブロック設定</h2>
-      <p>表示方法を調整できます。今後ここにもっと増やしていく予定です。</p>
+      <p>表示するブロックの縦の大きさを調整できます。長い文章はブロック内でスクロールして読めます。</p>
 
 
   <div class="field">
@@ -529,7 +537,7 @@ dialog::backdrop{
   </div>
 
   <div class="field hidden" id="blockRowsField">
-    <label for="blockRowsInput">行数</label>
+    <label for="blockRowsInput">高さの目安（行数）</label>
     <input id="blockRowsInput" type="number" min="1" max="50" step="1" />
   </div>
 
@@ -921,7 +929,7 @@ dialog::backdrop{
     function blockHeightStyle(block) {
       if (!block.heightEnabled) return '';
       const rows = Math.max(1, Math.min(50, Number(block.rows || 3) || 3));
-      return `min-height: calc(${rows} * 1.8em + 28px);`;
+      return `height: calc(${rows} * 1.8em + 84px); overflow:hidden;`;
     }
 
     function isMine(site) {
@@ -1107,11 +1115,11 @@ dialog::backdrop{
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">${editorHtml || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
-          <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}">
+          <article class="block${hiddenClass}${moveClass}" data-editor-block-card="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}">
             <div class="block-head">
               <div style="color:var(--muted);font-weight:900">ブロック ${index + 1}${normalized.visible === false ? ' / 非表示' : ''}</div>
               <button class="btn small" data-block-action="settings" data-block-id="${esc(normalized.id)}" type="button">⚙️</button>
