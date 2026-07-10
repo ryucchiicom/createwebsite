@@ -475,6 +475,16 @@ dialog::backdrop{
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
+  <div class="field">
+    <label for="styleOpenMarkerInput">開始記号</label>
+    <input id="styleOpenMarkerInput" type="text" value="'" maxlength="16" />
+  </div>
+
+  <div class="field">
+    <label for="styleCloseMarkerInput">終了記号</label>
+    <input id="styleCloseMarkerInput" type="text" value="&quot;" maxlength="16" />
+  </div>
+
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
@@ -635,11 +645,15 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
+    const STYLE_OPEN_MARKER_KEY = 'createwebsite:styleOpenMarker:v1';
+    const STYLE_CLOSE_MARKER_KEY = 'createwebsite:styleCloseMarker:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
+    const styleOpenMarkerInput = document.getElementById('styleOpenMarkerInput');
+    const styleCloseMarkerInput = document.getElementById('styleCloseMarkerInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -678,6 +692,8 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
+      styleOpenMarker: localStorage.getItem(STYLE_OPEN_MARKER_KEY) ?? "'",
+      styleCloseMarker: localStorage.getItem(STYLE_CLOSE_MARKER_KEY) ?? '"',
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -718,11 +734,9 @@ dialog::backdrop{
         if (node.tagName === 'SPAN') {
           const color = node.style.color;
           const fontSize = node.style.fontSize;
-          const backgroundColor = node.style.backgroundColor;
           node.removeAttribute('style');
           if (color) node.style.color = color;
           if (fontSize) node.style.fontSize = fontSize;
-          if (backgroundColor) node.style.backgroundColor = backgroundColor;
         } else {
           [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
         }
@@ -731,20 +745,31 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
+
+    function cleanMarkerValue(value, fallback) {
+      const cleaned = String(value ?? '').replace(/[\r\n]/g, '');
+      return cleaned.length ? cleaned : fallback;
+    }
+
+    function currentStyleMarkers() {
+      return {
+        open: cleanMarkerValue(state.styleOpenMarker, "'"),
+        close: cleanMarkerValue(state.styleCloseMarker, '"')
+      };
+    }
+
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { open } = currentStyleMarkers();
+      if (!open || !text.endsWith(open)) return null;
+      const body = text.slice(0, -open.length);
 
-      const backgroundMatch = text.match(/^B#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
-      if (backgroundMatch) {
-        return { type: 'background', value: `#${backgroundMatch[1]}` };
-      }
-
-      const colorMatch = text.match(/^(?:C)?#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
+      const colorMatch = body.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = text.match(/^S(\d{1,3})'$/);
+      const sizeMatch = body.match(/^S(\d{1,3})$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
       }
@@ -754,32 +779,21 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
-      const apostrophe = '&#39;';
-      if (command.type === 'background') {
-        return `<span style="background-color:${esc(command.value)}">${apostrophe}</span>`;
-      }
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
-      }
-      return '';
+      return esc(currentStyleMarkers().open);
     }
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { open: openMarker, close: closeMarker } = currentStyleMarkers();
 
       let html = '';
       let color = '';
-      let background = '';
       let size = '';
       let spanOpen = false;
 
       const currentStyle = () => {
         const styles = [];
         if (color) styles.push(`color:${color}`);
-        if (background) styles.push(`background-color:${background}`);
         if (size) styles.push(`font-size:${size}px`);
         return styles.join(';');
       };
@@ -798,44 +812,70 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const reopen = () => {
+      const syncSpan = () => {
         closeSpan();
-        if (color || background || size) openSpan();
+        if (color || size) openSpan();
       };
 
+      const applyColor = (value) => {
+        color = value;
+        syncSpan();
+      };
+
+      const applySize = (value) => {
+        size = value;
+        syncSpan();
+      };
+
+      const startsWithAt = (needle, index) => Boolean(needle) && text.startsWith(needle, index);
+
       for (let i = 0; i < text.length;) {
-        const ch = text[i];
+        if (startsWithAt(closeMarker, i)) {
+          closeSpan();
+          html += esc(closeMarker);
+          color = '';
+          size = '';
+          i += closeMarker.length;
+          continue;
+        }
+
         const remaining = text.slice(i);
-
-        const backgroundMatch = remaining.match(/^B#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
-        if (backgroundMatch) {
-          background = `#${backgroundMatch[1]}`;
-          reopen();
-          i += backgroundMatch[0].length;
-          continue;
-        }
-
-        const colorMatch = remaining.match(/^(?:C)?#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        const colorMatch = remaining.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          reopen();
-          i += colorMatch[0].length;
+          const afterToken = i + colorMatch[0].length;
+          const hasOpenMarker = startsWithAt(openMarker, afterToken);
+          applyColor(`#${colorMatch[1]}`);
+          if (hasOpenMarker) {
+            closeSpan();
+            html += esc(openMarker);
+            i = afterToken + openMarker.length;
+            syncSpan();
+          } else {
+            i = afterToken;
+          }
           continue;
         }
 
-        const sizeMatch = remaining.match(/^S(\d{1,3})/);
+        const sizeMatch = remaining.match(/^S(\d{1,3})(?!\d)/);
         if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
-          i += sizeMatch[0].length;
+          const afterToken = i + sizeMatch[0].length;
+          const hasOpenMarker = startsWithAt(openMarker, afterToken);
+          applySize(String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))));
+          if (hasOpenMarker) {
+            closeSpan();
+            html += esc(openMarker);
+            i = afterToken + openMarker.length;
+            syncSpan();
+          } else {
+            i = afterToken;
+          }
           continue;
         }
 
-        if (!spanOpen && (color || background || size)) openSpan();
+        if (!spanOpen && (color || size)) openSpan();
 
-        if (ch === '\n') html += '<br>';
-        else html += esc(ch);
-
+        const ch = text[i];
+        html += ch === '\n' ? '<br>' : esc(ch);
         i += 1;
       }
 
@@ -948,13 +988,12 @@ dialog::backdrop{
     }
 
     function normalizeBlock(block = {}) {
-      const html = typeof block.html === 'string' && block.html.trim()
-        ? sanitizeRichHtml(block.html)
-        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+      const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
+      const html = parseStyledSource(source || '');
 
       return {
         id: block.id || uid8(),
-        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
+        source,
         html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
@@ -1372,6 +1411,8 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
+      styleOpenMarkerInput.value = currentStyleMarkers().open;
+      styleCloseMarkerInput.value = currentStyleMarkers().close;
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1626,14 +1667,17 @@ dialog::backdrop{
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
       state.current.creatorId = state.current.creatorId || creatorId();
-      state.current.blocks = (state.current.blocks || []).map(normalizeBlock);
+      state.current.blocks = (state.current.blocks || []).map((block) => ({
+        ...normalizeBlock(block),
+        source: String(block.source || htmlToPlainText(block.html || ''))
+      }));
 
       const payload = {
         ...state.current,
         blocks: state.current.blocks.map((b) => ({
           id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
+          source: String(b.source || ''),
+          html: parseStyledSource(String(b.source || '')),
           visible: b.visible !== false,
           wrap: b.wrap !== false,
           heightEnabled: b.heightEnabled === true,
@@ -2036,6 +2080,22 @@ dialog::backdrop{
         return;
       }
 
+      if (target.id === 'styleOpenMarkerInput') {
+        const value = cleanMarkerValue(target.value, "'");
+        state.styleOpenMarker = value;
+        localStorage.setItem(STYLE_OPEN_MARKER_KEY, value);
+        target.value = value;
+        return;
+      }
+
+      if (target.id === 'styleCloseMarkerInput') {
+        const value = cleanMarkerValue(target.value, '"');
+        state.styleCloseMarker = value;
+        localStorage.setItem(STYLE_CLOSE_MARKER_KEY, value);
+        target.value = value;
+        return;
+      }
+
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2195,11 +2255,14 @@ dialog::backdrop{
 
     function bootstrap() {
       updateAddBarOpacityLabel();
+      state.styleOpenMarker = cleanMarkerValue(state.styleOpenMarker, "'");
+      state.styleCloseMarker = cleanMarkerValue(state.styleCloseMarker, '"');
+      localStorage.setItem(STYLE_OPEN_MARKER_KEY, state.styleOpenMarker);
+      localStorage.setItem(STYLE_CLOSE_MARKER_KEY, state.styleCloseMarker);
       state.mode = 'loading';
       renderApp();
       initFirebase();
     }
-
     bootstrap();
   </script>
 
