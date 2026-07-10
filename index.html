@@ -756,7 +756,7 @@ dialog::backdrop{
       return '';
     }
 
-    function parseStyledSource(input) {
+    function parseStyledSourceInternal(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
 
       let html = '';
@@ -928,7 +928,7 @@ dialog::backdrop{
     function normalizeBlock(block = {}) {
       const html = typeof block.html === 'string' && block.html.trim()
         ? sanitizeRichHtml(block.html)
-        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+        : parseStyledSourceInternal(block.source || htmlToPlainText(block.html || ''));
 
       return {
         id: block.id || uid8(),
@@ -1157,7 +1157,7 @@ dialog::backdrop{
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
-        const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
+        const editorHtml = normalized.html || parseStyledSourceInternal(normalized.source || '');
         const preview = normalized.visible
           ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
@@ -1530,7 +1530,7 @@ dialog::backdrop{
           return {
             id: b.id,
             source,
-            html: parseStyledSource(source) || '<br>',
+            html: parseStyledSourceInternal(source) || '<br>',
             visible: b.visible !== false,
             wrap: b.wrap !== false,
             heightEnabled: b.heightEnabled === true,
@@ -1611,7 +1611,7 @@ dialog::backdrop{
         blocks: state.current.blocks.map((b) => ({
           id: b.id,
           source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
+          html: b.html || parseStyledSourceInternal(b.source || ''),
           visible: b.visible !== false,
           wrap: b.wrap !== false,
           heightEnabled: b.heightEnabled === true,
