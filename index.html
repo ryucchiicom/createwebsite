@@ -718,9 +718,11 @@ dialog::backdrop{
         if (node.tagName === 'SPAN') {
           const color = node.style.color;
           const fontSize = node.style.fontSize;
+          const backgroundColor = node.style.backgroundColor;
           node.removeAttribute('style');
           if (color) node.style.color = color;
           if (fontSize) node.style.fontSize = fontSize;
+          if (backgroundColor) node.style.backgroundColor = backgroundColor;
         } else {
           [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
         }
@@ -731,7 +733,13 @@ dialog::backdrop{
 
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
+
+      const backgroundMatch = text.match(/^B#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
+      if (backgroundMatch) {
+        return { type: 'background', value: `#${backgroundMatch[1]}` };
+      }
+
+      const colorMatch = text.match(/^(?:C)?#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
@@ -747,6 +755,9 @@ dialog::backdrop{
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
       const apostrophe = '&#39;';
+      if (command.type === 'background') {
+        return `<span style="background-color:${esc(command.value)}">${apostrophe}</span>`;
+      }
       if (command.type === 'color') {
         return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
       }
@@ -756,17 +767,19 @@ dialog::backdrop{
       return '';
     }
 
-    function parseStyledSourceInternal(input) {
+    function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
 
       let html = '';
       let color = '';
+      let background = '';
       let size = '';
       let spanOpen = false;
 
       const currentStyle = () => {
         const styles = [];
         if (color) styles.push(`color:${color}`);
+        if (background) styles.push(`background-color:${background}`);
         if (size) styles.push(`font-size:${size}px`);
         return styles.join(';');
       };
@@ -787,13 +800,22 @@ dialog::backdrop{
 
       const reopen = () => {
         closeSpan();
-        if (color || size) openSpan();
+        if (color || background || size) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
         const ch = text[i];
+        const remaining = text.slice(i);
 
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        const backgroundMatch = remaining.match(/^B#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        if (backgroundMatch) {
+          background = `#${backgroundMatch[1]}`;
+          reopen();
+          i += backgroundMatch[0].length;
+          continue;
+        }
+
+        const colorMatch = remaining.match(/^(?:C)?#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
           color = `#${colorMatch[1]}`;
           reopen();
@@ -801,7 +823,7 @@ dialog::backdrop{
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
+        const sizeMatch = remaining.match(/^S(\d{1,3})/);
         if (sizeMatch) {
           size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
           reopen();
@@ -809,7 +831,7 @@ dialog::backdrop{
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
+        if (!spanOpen && (color || background || size)) openSpan();
 
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
@@ -928,7 +950,7 @@ dialog::backdrop{
     function normalizeBlock(block = {}) {
       const html = typeof block.html === 'string' && block.html.trim()
         ? sanitizeRichHtml(block.html)
-        : parseStyledSourceInternal(block.source || htmlToPlainText(block.html || ''));
+        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
 
       return {
         id: block.id || uid8(),
@@ -1157,7 +1179,7 @@ dialog::backdrop{
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
-        const editorHtml = normalized.html || parseStyledSourceInternal(normalized.source || '');
+        const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
         const preview = normalized.visible
           ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
@@ -1530,7 +1552,7 @@ dialog::backdrop{
           return {
             id: b.id,
             source,
-            html: parseStyledSourceInternal(source) || '<br>',
+            html: parseStyledSource(source) || '<br>',
             visible: b.visible !== false,
             wrap: b.wrap !== false,
             heightEnabled: b.heightEnabled === true,
@@ -1611,7 +1633,7 @@ dialog::backdrop{
         blocks: state.current.blocks.map((b) => ({
           id: b.id,
           source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSourceInternal(b.source || ''),
+          html: b.html || parseStyledSource(b.source || ''),
           visible: b.visible !== false,
           wrap: b.wrap !== false,
           heightEnabled: b.heightEnabled === true,
