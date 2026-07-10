@@ -157,6 +157,13 @@ p{color:var(--muted);line-height:1.8}
   align-items:center;
   margin-bottom:12px;
 }
+.fixed-top-btn{
+  position:fixed;
+  top:12px;
+  left:12px;
+  z-index:120;
+  box-shadow:var(--shadow);
+}
 
 .field{display:grid;gap:7px;margin:12px 0}
 .field label{font-weight:800;font-size:.92rem}
@@ -636,6 +643,7 @@ dialog::backdrop{
     const siteKeyInput = document.getElementById('siteKeyInput');
     const siteDeleteBtn = document.getElementById('siteDeleteBtn');
     const siteClearKeyBtn = document.getElementById('siteClearKeyBtn');
+    const siteSettingsSaveBtn = document.getElementById('siteSettingsSaveBtn');
     const blockSettingsDialog = document.getElementById('blockSettingsDialog');
     const blockVisibleToggle = document.getElementById('blockVisibleToggle');
     const blockWrapToggle = document.getElementById('blockWrapToggle');
@@ -668,7 +676,8 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      moveBlockId: null
+      moveBlockId: null,
+      pendingSiteDelete: false
     };
 
     let longPressTimer = null;
@@ -849,6 +858,21 @@ dialog::backdrop{
       return `${basePageUrl()}#/${siteId}${key ? `/${key}` : ''}`;
     }
 
+    function syncDocumentMeta() {
+      const title = state.current?.title ? String(state.current.title).trim() : '';
+      document.title = title || 'CreateWebsite';
+
+      const description = document.querySelector('meta[name="description"]');
+      if (description) {
+        if (state.current && state.mode !== 'home' && state.mode !== 'boot-failed' && state.mode !== 'loading') {
+          const linkType = state.currentAccess === 'key' ? '共同編集' : '閲覧';
+          description.setAttribute('content', `CreateWebsiteで作成されたサイトの${linkType}リンクです`);
+        } else {
+          description.setAttribute('content', 'メモを書くようにサイトを作って共有できるサービス');
+        }
+      }
+    }
+
     function parseRoute() {
       const hash = decodeURI(location.hash || '');
       if (!hash.startsWith('#/')) return { name: 'home', siteId: null, key: null };
@@ -869,6 +893,14 @@ dialog::backdrop{
     }
 
     function addBlockButtonStyle() {
+      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
+      if (isDarkMode()) {
+        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
+      }
+      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
+    }
+
+    function topButtonStyle() {
       const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
       if (isDarkMode()) {
         return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
@@ -1101,7 +1133,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
+            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
             <div class="toolbar" style="justify-content:flex-end">
               ${statusHtml}
               <button class="btn" id="viewerShareBtn" type="button">共有</button>
@@ -1139,12 +1171,12 @@ dialog::backdrop{
         `;
       }).join('');
 
-      const backLabel = state.currentSaved ? '← 戻る' : '← 一覧へ';
+      const backLabel = 'トップ';
 
       appRoot.innerHTML = `
         <div class="editor-top">
           <div>
-            <button class="btn ghost" id="backBtn" type="button">${backLabel}</button>
+            <button class="btn ghost fixed-top-btn" id="backBtn" type="button" style="${topButtonStyle()}">${backLabel}</button>
             <h2 id="editorHeading">${esc(site?.title || '無題のサイト')}</h2>
           </div>
           <div class="toolbar">
@@ -1181,7 +1213,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
+            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
           </div>
           <h2>サイトが見つかりません</h2>
           <div class="canvas" style="margin-top:14px">
@@ -1195,7 +1227,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
+            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
           </div>
           <h2>アクセスできません</h2>
           <div class="canvas" style="margin-top:14px">
@@ -1206,6 +1238,7 @@ dialog::backdrop{
     }
 
     function renderApp() {
+      syncDocumentMeta();
       if (state.mode === 'loading') drawLoadingScreen();
       else if (state.mode === 'home') drawHomeScreen();
       else if (state.mode === 'viewer') drawViewerScreen();
@@ -1304,10 +1337,12 @@ dialog::backdrop{
 
     function openSiteSettingsModal() {
       if (!state.current || !isCurrentCreator()) return;
+      state.pendingSiteDelete = false;
       sitePublicToggle.checked = state.current.isPublic !== false;
       siteKeyInput.value = state.current.key || '';
       siteDeleteBtn.classList.toggle('hidden', !isCurrentCreator());
       siteClearKeyBtn.classList.toggle('hidden', !isCurrentCreator());
+      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
@@ -1414,6 +1449,20 @@ dialog::backdrop{
     async function saveSiteSettings() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
+      if (state.pendingSiteDelete) {
+        await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
+        state.pendingSiteDelete = false;
+        if (siteSettingsDialog.open) siteSettingsDialog.close();
+        state.current = null;
+        state.currentSaved = false;
+        state.currentAccess = 'view';
+        location.hash = '';
+        state.mode = 'home';
+        await loadAllSites();
+        renderApp();
+        return;
+      }
+
       state.current.isPublic = !!sitePublicToggle.checked;
       state.current.key = String(siteKeyInput.value || '').trim();
       state.current.collaborative = Boolean(state.current.key);
@@ -1428,6 +1477,8 @@ dialog::backdrop{
 
       await loadAllSites();
       if (siteSettingsDialog.open) siteSettingsDialog.close();
+      state.pendingSiteDelete = false;
+      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       renderApp();
       syncCurrentUrl();
     }
@@ -1454,16 +1505,9 @@ dialog::backdrop{
     async function deleteCurrentSite() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
-      const ok = confirm('このサイトを削除しますか？');
-      if (!ok) return;
-
-      await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
-      state.current = null;
-      state.currentSaved = false;
-      state.currentAccess = 'view';
-      location.hash = '';
+      state.pendingSiteDelete = true;
+      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = 'サイトの削除を確定';
       state.mode = 'home';
-      await loadAllSites();
       renderApp();
     }
 
@@ -1838,6 +1882,8 @@ dialog::backdrop{
       }
 
       if (target.closest('#siteSettingsCancelBtn')) {
+        state.pendingSiteDelete = false;
+        if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
         if (siteSettingsDialog.open) siteSettingsDialog.close();
         return;
       }
@@ -1970,6 +2016,7 @@ dialog::backdrop{
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
         if (heading) heading.textContent = target.value || '無題のサイト';
+        syncDocumentMeta();
         state.currentSaved = false;
         return;
       }
