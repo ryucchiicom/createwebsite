@@ -636,7 +636,6 @@ dialog::backdrop{
     const siteKeyInput = document.getElementById('siteKeyInput');
     const siteDeleteBtn = document.getElementById('siteDeleteBtn');
     const siteClearKeyBtn = document.getElementById('siteClearKeyBtn');
-    const siteSettingsSaveBtn = document.getElementById('siteSettingsSaveBtn');
     const blockSettingsDialog = document.getElementById('blockSettingsDialog');
     const blockVisibleToggle = document.getElementById('blockVisibleToggle');
     const blockWrapToggle = document.getElementById('blockWrapToggle');
@@ -669,8 +668,7 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      moveBlockId: null,
-      pendingSiteDelete: false
+      moveBlockId: null
     };
 
     let longPressTimer = null;
@@ -1306,12 +1304,10 @@ dialog::backdrop{
 
     function openSiteSettingsModal() {
       if (!state.current || !isCurrentCreator()) return;
-      state.pendingSiteDelete = false;
       sitePublicToggle.checked = state.current.isPublic !== false;
       siteKeyInput.value = state.current.key || '';
       siteDeleteBtn.classList.toggle('hidden', !isCurrentCreator());
       siteClearKeyBtn.classList.toggle('hidden', !isCurrentCreator());
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
@@ -1418,20 +1414,6 @@ dialog::backdrop{
     async function saveSiteSettings() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
-      if (state.pendingSiteDelete) {
-        await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
-        state.pendingSiteDelete = false;
-        if (siteSettingsDialog.open) siteSettingsDialog.close();
-        state.current = null;
-        state.currentSaved = false;
-        state.currentAccess = 'view';
-        location.hash = '';
-        state.mode = 'home';
-        await loadAllSites();
-        renderApp();
-        return;
-      }
-
       state.current.isPublic = !!sitePublicToggle.checked;
       state.current.key = String(siteKeyInput.value || '').trim();
       state.current.collaborative = Boolean(state.current.key);
@@ -1446,8 +1428,6 @@ dialog::backdrop{
 
       await loadAllSites();
       if (siteSettingsDialog.open) siteSettingsDialog.close();
-      state.pendingSiteDelete = false;
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       renderApp();
       syncCurrentUrl();
     }
@@ -1474,9 +1454,16 @@ dialog::backdrop{
     async function deleteCurrentSite() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
-      state.pendingSiteDelete = true;
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = 'サイトの削除を確定';
+      const ok = confirm('このサイトを削除しますか？');
+      if (!ok) return;
+
+      await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
+      state.current = null;
+      state.currentSaved = false;
+      state.currentAccess = 'view';
+      location.hash = '';
       state.mode = 'home';
+      await loadAllSites();
       renderApp();
     }
 
@@ -1851,8 +1838,6 @@ dialog::backdrop{
       }
 
       if (target.closest('#siteSettingsCancelBtn')) {
-        state.pendingSiteDelete = false;
-        if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
         if (siteSettingsDialog.open) siteSettingsDialog.close();
         return;
       }
