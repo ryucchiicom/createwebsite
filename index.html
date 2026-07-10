@@ -905,9 +905,9 @@ dialog::backdrop{
     function topButtonStyle() {
       const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
       if (isDarkMode()) {
-        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);`;
+        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);`;
       }
-      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
+      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);`;
     }
 
     function persistAddBarOpacity(value) {
