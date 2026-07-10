@@ -212,8 +212,7 @@ p{color:var(--muted);line-height:1.8}
   word-break:break-word;
   max-width:100%;
 }
-.rendered-text[style*="height:"],
-.editor-text[style*="height:"]{
+.rendered-text[style*="height:"]{
   overflow:auto;
   -webkit-overflow-scrolling:touch;
 }
@@ -1116,7 +1115,7 @@ dialog::backdrop{
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
         const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
         const preview = normalized.visible
-          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockHeightStyle(normalized)}${blockContentStyle(normalized)}">${editorHtml || ''}</div>`
+          ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}" style="${blockContentStyle(normalized)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
 
         return `
@@ -1901,11 +1900,20 @@ dialog::backdrop{
 
       if (target.closest('#copyShareBtn')) {
         const url = currentShareUrl();
+        const copyBtn = document.getElementById('copyShareBtn');
         if (!url) {
           alert('先に保存してね。');
           return;
         }
-        navigator.clipboard.writeText(url).then(() => alert('コピーしました')).catch(() => prompt('コピーできないときはこれを使ってね', url));
+        navigator.clipboard.writeText(url).then(() => {
+          if (copyBtn) {
+            const prevText = copyBtn.textContent;
+            copyBtn.textContent = 'コピーしました';
+            setTimeout(() => {
+              copyBtn.textContent = prevText || 'URLコピー';
+            }, 1500);
+          }
+        }).catch(() => prompt('コピーできないときはこれを使ってね', url));
         return;
       }
 
