@@ -746,7 +746,14 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
-      return '&#39;';
+      const apostrophe = '&#39;';
+      if (command.type === 'color') {
+        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
+      }
+      if (command.type === 'size') {
+        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
+      }
+      return '';
     }
 
     function parseStyledSource(input) {
@@ -756,6 +763,7 @@ dialog::backdrop{
       let color = '';
       let size = '';
       let spanOpen = false;
+      let plainUntilQuote = false;
 
       const currentStyle = () => {
         const styles = [];
@@ -786,6 +794,19 @@ dialog::backdrop{
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
+        if (plainUntilQuote) {
+          if (ch === '"') {
+            html += esc(ch);
+            plainUntilQuote = false;
+          } else if (ch === '\n') {
+            html += '<br>';
+          } else {
+            html += esc(ch);
+          }
+          i += 1;
+          continue;
+        }
+
         const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
           color = `#${colorMatch[1]}`;
@@ -802,6 +823,16 @@ dialog::backdrop{
           continue;
         }
 
+        if (ch === '€') {
+          closeSpan();
+          color = '';
+          size = '';
+          html += esc(ch);
+          plainUntilQuote = text.indexOf('\"', i + 1) !== -1;
+          i += 1;
+          continue;
+        }
+
         if (!spanOpen && (color || size)) openSpan();
 
         if (ch === '\n') html += '<br>';
@@ -813,6 +844,7 @@ dialog::backdrop{
       closeSpan();
       return html;
     }
+
 
     function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
