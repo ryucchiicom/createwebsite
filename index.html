@@ -467,7 +467,8 @@ dialog::backdrop{
   <dialog id="homeSettingsDialog">
     <div class="dialog-body">
       <h2>画面設定</h2>
-      <p>下の「＋ 追加」バーの透過度と、形式の開始・終了記号を変えられます。</p>
+      <p>下の「＋ 追加」バーの透過度を変えられます。今後ここに設定を増やしていけます。</p>
+
 
   <div class="field">
     <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
@@ -475,19 +476,20 @@ dialog::backdrop{
   </div>
 
   <div class="field">
-    <label for="formatStartInput">形式の開始記号（複数文字可・改行不可）</label>
-    <input id="formatStartInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="例：'" />
+    <label for="formatOpenInput">形式の開始記号</label>
+    <input id="formatOpenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="例：'" />
   </div>
 
   <div class="field">
-    <label for="formatEndInput">形式の終了記号（複数文字可・改行不可）</label>
-    <input id="formatEndInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder='例："' />
+    <label for="formatCloseInput">形式の終了記号</label>
+    <input id="formatCloseInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="例：&quot;" />
   </div>
 
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
 </div>
+
 
   </dialog>
 
@@ -643,15 +645,15 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const FORMAT_START_TOKEN_KEY = 'createwebsite:formatStartToken:v1';
-    const FORMAT_END_TOKEN_KEY = 'createwebsite:formatEndToken:v1';
+    const FORMAT_OPEN_TOKEN_KEY = 'createwebsite:formatOpenToken:v1';
+    const FORMAT_CLOSE_TOKEN_KEY = 'createwebsite:formatCloseToken:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
-    const formatStartInput = document.getElementById('formatStartInput');
-    const formatEndInput = document.getElementById('formatEndInput');
+    const formatOpenInput = document.getElementById('formatOpenInput');
+    const formatCloseInput = document.getElementById('formatCloseInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -690,6 +692,14 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
+      formatOpenToken: (() => {
+        const value = String(localStorage.getItem(FORMAT_OPEN_TOKEN_KEY) ?? "'").replace(/\r?\n/g, '');
+        return value || "'";
+      })(),
+      formatCloseToken: (() => {
+        const value = String(localStorage.getItem(FORMAT_CLOSE_TOKEN_KEY) ?? '"').replace(/\r?\n/g, '');
+        return value || '"';
+      })(),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -709,37 +719,6 @@ dialog::backdrop{
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
-
-    function normalizeFormatToken(value, fallback) {
-      const cleaned = String(value ?? '').replace(/[\r\n]+/g, '');
-      return cleaned.length ? cleaned : fallback;
-    }
-
-    function getFormatTokens() {
-      return {
-        start: normalizeFormatToken(localStorage.getItem(FORMAT_START_TOKEN_KEY), "'"),
-        end: normalizeFormatToken(localStorage.getItem(FORMAT_END_TOKEN_KEY), '"')
-      };
-    }
-
-    function syncFormatTokenInputs() {
-      const tokens = getFormatTokens();
-      if (formatStartInput) formatStartInput.value = tokens.start;
-      if (formatEndInput) formatEndInput.value = tokens.end;
-    }
-
-    function persistFormatTokens(partial = {}) {
-      const current = getFormatTokens();
-      const next = {
-        start: normalizeFormatToken(Object.prototype.hasOwnProperty.call(partial, 'start') ? partial.start : current.start, "'"),
-        end: normalizeFormatToken(Object.prototype.hasOwnProperty.call(partial, 'end') ? partial.end : current.end, '"')
-      };
-      localStorage.setItem(FORMAT_START_TOKEN_KEY, next.start);
-      localStorage.setItem(FORMAT_END_TOKEN_KEY, next.end);
-      if (formatStartInput) formatStartInput.value = next.start;
-      if (formatEndInput) formatEndInput.value = next.end;
-      renderApp();
     }
 
     function htmlToPlainText(html) {
@@ -772,20 +751,76 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-    function parseStyledSource(input) {
+    function normalizeFormatToken(value, fallback) {
+      const normalized = String(value ?? '').replace(/\r?\n/g, '');
+      return normalized.length ? normalized : fallback;
+    }
+
+    function escapeRegExp(value) {
+      return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function getFormatTokens() {
+      return {
+        open: normalizeFormatToken(state.formatOpenToken, "'"),
+        close: normalizeFormatToken(state.formatCloseToken, '"')
+      };
+    }
+
+    function hasStyledSyntax(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const { start: startToken, end: endToken } = getFormatTokens();
+      const { open } = getFormatTokens();
+      const openPattern = escapeRegExp(open);
+      return new RegExp(`(?:#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})|S\\d{1,3})${openPattern}`).test(text);
+    }
+
+    function getStandaloneStyleCommand(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { open } = getFormatTokens();
+      const openPattern = escapeRegExp(open);
+
+      const colorMatch = text.match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${openPattern}$`));
+      if (colorMatch) {
+        return { type: 'color', value: `#${colorMatch[1]}` };
+      }
+
+      const sizeMatch = text.match(new RegExp(`^S(\\d{1,3})${openPattern}$`));
+      if (sizeMatch) {
+        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
+      }
+
+      return null;
+    }
+
+    function renderStandaloneStyleCommand(command) {
+      if (!command) return '';
+      const apostrophe = '&#39;';
+      if (command.type === 'color') {
+        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
+      }
+      if (command.type === 'size') {
+        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
+      }
+      return '';
+    }
+
+    function compileStyledSource(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { open, close } = getFormatTokens();
+      const openLen = open.length;
+      const closeLen = close.length;
+      const colorTokenRe = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/;
+      const sizeTokenRe = /^S(\d{1,3})/;
 
       let html = '';
-      let pendingColor = '';
-      let pendingSize = '';
-      let regionOpen = false;
+      let activeColor = '';
+      let activeSize = '';
       let spanOpen = false;
 
-      const styleString = () => {
+      const currentStyle = () => {
         const styles = [];
-        if (pendingColor) styles.push(`color:${pendingColor}`);
-        if (pendingSize) styles.push(`font-size:${pendingSize}px`);
+        if (activeColor) styles.push(`color:${activeColor}`);
+        if (activeSize) styles.push(`font-size:${activeSize}px`);
         return styles.join(';');
       };
 
@@ -797,62 +832,67 @@ dialog::backdrop{
       };
 
       const openSpan = () => {
-        const style = styleString();
+        const style = currentStyle();
         if (!style) return;
         html += `<span style="${style}">`;
         spanOpen = true;
       };
 
-      const reopenSpanIfNeeded = () => {
-        if (!regionOpen) return;
+      const reopenSpan = () => {
         closeSpan();
-        openSpan();
+        if (activeColor || activeSize) openSpan();
       };
 
-      const startsWithToken = (token, index) => Boolean(token) && text.startsWith(token, index);
-
       for (let i = 0; i < text.length;) {
-        const ch = text[i];
+        const remainder = text.slice(i);
 
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
-        if (colorMatch) {
-          pendingColor = `#${colorMatch[1]}`;
-          reopenSpanIfNeeded();
-          i += colorMatch[0].length;
-          continue;
-        }
-
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
-        if (sizeMatch) {
-          pendingSize = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopenSpanIfNeeded();
-          i += sizeMatch[0].length;
-          continue;
-        }
-
-        if (!regionOpen && styleString() && startsWithToken(startToken, i)) {
-          html += esc(startToken);
-          regionOpen = true;
-          openSpan();
-          i += startToken.length;
-          continue;
-        }
-
-        if (regionOpen && startsWithToken(endToken, i)) {
+        const colorMatch = remainder.match(colorTokenRe);
+        if (colorMatch && open && remainder.startsWith(colorMatch[0] + open)) {
+          const tokenText = colorMatch[0] + open;
           closeSpan();
-          html += esc(endToken);
-          regionOpen = false;
-          pendingColor = '';
-          pendingSize = '';
-          i += endToken.length;
+          html += esc(tokenText);
+          activeColor = `#${colorMatch[1]}`;
+          reopenSpan();
+          i += tokenText.length;
           continue;
         }
 
-        if (regionOpen && !spanOpen) openSpan();
+        const sizeMatch = remainder.match(sizeTokenRe);
+        if (sizeMatch && open && remainder.startsWith(sizeMatch[0] + open)) {
+          const tokenText = sizeMatch[0] + open;
+          closeSpan();
+          html += esc(tokenText);
+          activeSize = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopenSpan();
+          i += tokenText.length;
+          continue;
+        }
 
+        if (close && remainder.startsWith(close)) {
+          if (activeColor || activeSize) {
+            closeSpan();
+            html += esc(close);
+            activeColor = '';
+            activeSize = '';
+            i += closeLen;
+            continue;
+          }
+          html += esc(close);
+          i += closeLen;
+          continue;
+        }
+
+        if (open && remainder.startsWith(open)) {
+          html += esc(open);
+          i += openLen;
+          continue;
+        }
+
+        if (!spanOpen && (activeColor || activeSize)) openSpan();
+
+        const ch = text[i];
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
-
         i += 1;
       }
 
@@ -860,8 +900,18 @@ dialog::backdrop{
       return html;
     }
 
-    function getCookie(name) {
+    function renderBlockHtml(block = {}) {
+      const source = String(block.source ?? '');
+      const fallbackHtml = typeof block.html === 'string' ? block.html : '';
+      if (hasStyledSyntax(source)) {
+        return compileStyledSource(source) || '<br>';
+      }
+      const sanitized = sanitizeRichHtml(fallbackHtml);
+      if (sanitized) return sanitized;
+      return source ? source.replace(/\n/g, '<br>') : '';
+    }
 
+    function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -966,45 +1016,19 @@ dialog::backdrop{
     }
 
     function normalizeBlock(block = {}) {
-      const html = typeof block.html === 'string' && block.html.trim()
-        ? sanitizeRichHtml(block.html)
-        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+      const source = typeof block.source === 'string'
+        ? block.source
+        : htmlToPlainText(block.html || '');
 
       return {
         id: block.id || uid8(),
-        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
-        html,
+        source,
+        html: renderBlockHtml({ source, html: block.html || '' }),
         visible: block.visible !== false,
         wrap: block.wrap !== false,
         heightEnabled: block.heightEnabled === true,
         rows: Math.max(1, Math.min(50, Number(block.rows || 3) || 3))
       };
-    }
-
-    function normalizeSite(siteId, data = {}) {
-      return {
-        siteId: siteId || data.siteId || uid8(),
-        title: data.title || '無題のサイト',
-        key: data.key || '',
-        ownerUid: data.ownerUid || '',
-        creatorId: data.creatorId || creatorId(),
-        collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
-        blocks: Array.isArray(data.blocks) ? data.blocks : [],
-        isPublic: data.isPublic !== false,
-        collaborative: Boolean(data.collaborative || data.key),
-        createdAt: data.createdAt || Date.now(),
-        updatedAt: data.updatedAt || Date.now()
-      };
-    }
-
-    function blockHeightStyle(block) {
-      if (!block.heightEnabled) return '';
-      const rows = Math.max(1, Math.min(50, Number(block.rows || 3) || 3));
-      return `height: calc(${rows} * 1.8em + 28px); overflow:auto; -webkit-overflow-scrolling:touch;`;
-    }
-
-    function blockContentStyle(block) {
-      return block.heightEnabled ? 'display:block;' : '';
     }
 
     function isMine(site) {
@@ -1164,7 +1188,7 @@ dialog::backdrop{
         .filter((block) => block.visible !== false)
         .map((block) => `
           <article class="block">
-            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}" style="${blockHeightStyle(block)}">${block.html || ''}</div>
+            <div class="rendered-text${block.wrap === false ? ' no-wrap' : ''}" style="${blockHeightStyle(block)}">${renderBlockHtml(block)}</div>
           </article>
         `).join('');
 
@@ -1197,7 +1221,7 @@ dialog::backdrop{
         const normalized = normalizeBlock(block);
         const hiddenClass = normalized.visible ? '' : ' hidden-block';
         const moveClass = state.moveBlockId === normalized.id ? ' move-source' : '';
-        const editorHtml = normalized.html || parseStyledSource(normalized.source || '');
+        const editorHtml = normalized.html || renderBlockHtml(normalized);
         const preview = normalized.visible
           ? `<div class="editor-text" contenteditable="true" spellcheck="false" data-editor-block="${esc(normalized.id)}">${editorHtml || ''}</div>`
           : `<div class="empty" style="padding:16px 10px">このブロックは非表示です。</div>`;
@@ -1390,7 +1414,8 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
-      syncFormatTokenInputs();
+      if (formatOpenInput) formatOpenInput.value = normalizeFormatToken(state.formatOpenToken, "'");
+      if (formatCloseInput) formatCloseInput.value = normalizeFormatToken(state.formatCloseToken, '"');
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1571,7 +1596,7 @@ dialog::backdrop{
           return {
             id: b.id,
             source,
-            html: parseStyledSource(source) || '<br>',
+            html: renderBlockHtml({ source, html: b.html || '' }) || '<br>',
             visible: b.visible !== false,
             wrap: b.wrap !== false,
             heightEnabled: b.heightEnabled === true,
@@ -1649,15 +1674,18 @@ dialog::backdrop{
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks.map((b) => ({
-          id: b.id,
-          source: b.source || htmlToPlainText(b.html || ''),
-          html: b.html || parseStyledSource(b.source || ''),
-          visible: b.visible !== false,
-          wrap: b.wrap !== false,
-          heightEnabled: b.heightEnabled === true,
-          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-        })),
+        blocks: state.current.blocks.map((b) => {
+          const source = String(b.source || htmlToPlainText(b.html || ''));
+          return {
+            id: b.id,
+            source,
+            html: renderBlockHtml({ source, html: b.html || '' }) || '<br>',
+            visible: b.visible !== false,
+            wrap: b.wrap !== false,
+            heightEnabled: b.heightEnabled === true,
+            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+          };
+        }),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1668,7 +1696,8 @@ dialog::backdrop{
       state.current = normalizeSite(state.current.siteId, payload);
       state.current.blocks = state.current.blocks.map((block) => ({
         ...normalizeBlock(block),
-        source: String(block.source || htmlToPlainText(block.html || ''))
+        source: String(block.source || htmlToPlainText(block.html || '')),
+        html: renderBlockHtml({ source: String(block.source || htmlToPlainText(block.html || '')), html: block.html || '' }) || '<br>'
       }));
       await loadAllSites();
       state.mode = 'editor';
@@ -1784,30 +1813,22 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw) || '<br>';
+      const compiledHtml = renderBlockHtml({ source: raw, html: element.innerHTML }) || '<br>';
 
       state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = html;
+      state.current.blocks[idx].html = compiledHtml;
       state.currentSaved = false;
 
-      const selectionKeep = document.activeElement === element;
-      if (element.innerHTML !== html) {
-        element.innerHTML = html;
-        if (selectionKeep) {
-          const selection = window.getSelection?.();
-          if (selection) {
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-        }
+      const shouldRebuild = hasStyledSyntax(raw) && element.innerHTML !== compiledHtml;
+      if (shouldRebuild) {
+        element.innerHTML = compiledHtml;
+        element.blur?.();
+        const selection = window.getSelection?.();
+        if (selection) selection.removeAllRanges();
       }
     }
 
     function handleClick(target) {
-
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
@@ -2061,20 +2082,6 @@ dialog::backdrop{
         return;
       }
 
-      if (target.id === 'formatStartInput') {
-        const cleaned = String(target.value || '').replace(/[\r\n]+/g, '');
-        target.value = cleaned;
-        persistFormatTokens({ start: cleaned });
-        return;
-      }
-
-      if (target.id === 'formatEndInput') {
-        const cleaned = String(target.value || '').replace(/[\r\n]+/g, '');
-        target.value = cleaned;
-        persistFormatTokens({ end: cleaned });
-        return;
-      }
-
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2097,6 +2104,24 @@ dialog::backdrop{
         return;
       }
 
+      if (target.id === 'formatOpenInput') {
+        const normalized = normalizeFormatToken(target.value, "'");
+        target.value = normalized;
+        state.formatOpenToken = normalized;
+        localStorage.setItem(FORMAT_OPEN_TOKEN_KEY, normalized);
+        if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
+        return;
+      }
+
+      if (target.id === 'formatCloseInput') {
+        const normalized = normalizeFormatToken(target.value, '"');
+        target.value = normalized;
+        state.formatCloseToken = normalized;
+        localStorage.setItem(FORMAT_CLOSE_TOKEN_KEY, normalized);
+        if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
+        return;
+      }
+
       if (target.id === 'blockHeightToggle') {
         blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
         return;
@@ -2114,7 +2139,6 @@ dialog::backdrop{
     }
 
     function handlePointerDown(event) {
-
       if (state.mode !== 'editor') return;
       const card = event.target.closest('[data-editor-block-card]');
       if (!card) return;
@@ -2235,7 +2259,6 @@ dialog::backdrop{
 
     function bootstrap() {
       updateAddBarOpacityLabel();
-      syncFormatTokenInputs();
       state.mode = 'loading';
       renderApp();
       initFirebase();
