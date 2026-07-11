@@ -475,18 +475,6 @@ dialog::backdrop{
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
-  <div class="field">
-    <label for="formatStartDelimiterInput">形式の開始文字</label>
-    <input id="formatStartDelimiterInput" type="text" autocomplete="off" spellcheck="false" />
-  </div>
-
-  <div class="field">
-    <label for="formatEndDelimiterInput">形式の終了文字</label>
-    <input id="formatEndDelimiterInput" type="text" autocomplete="off" spellcheck="false" />
-  </div>
-
-  <p class="notice">複数文字可、改行は不可です。</p>
-
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
@@ -647,14 +635,11 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const FORMAT_DELIMITER_SETTINGS_KEY = 'createwebsite:formatDelimiters:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
-    const formatStartDelimiterInput = document.getElementById('formatStartDelimiterInput');
-    const formatEndDelimiterInput = document.getElementById('formatEndDelimiterInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -693,26 +678,6 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      formatStartDelimiter: (() => {
-        try {
-          const raw = localStorage.getItem(FORMAT_DELIMITER_SETTINGS_KEY);
-          const parsed = raw ? JSON.parse(raw) : null;
-          const value = String(parsed?.start ?? "'").replace(/\r?\n/g, '');
-          return value || "'";
-        } catch {
-          return "'";
-        }
-      })(),
-      formatEndDelimiter: (() => {
-        try {
-          const raw = localStorage.getItem(FORMAT_DELIMITER_SETTINGS_KEY);
-          const parsed = raw ? JSON.parse(raw) : null;
-          const value = String(parsed?.end ?? '"').replace(/\r?\n/g, '');
-          return value || '"';
-        } catch {
-          return '"';
-        }
-      })(),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -732,41 +697,6 @@ dialog::backdrop{
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
-
-    function escapeRegExp(value) {
-      return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    function normalizeDelimiterValue(value, fallback) {
-      const text = String(value ?? '').replace(/\r?\n/g, '');
-      return text.length ? text : fallback;
-    }
-
-    function loadDelimiterSettings() {
-      try {
-        const raw = localStorage.getItem(FORMAT_DELIMITER_SETTINGS_KEY);
-        if (!raw) {
-          return { start: "'", end: '"' };
-        }
-        const parsed = JSON.parse(raw);
-        return {
-          start: normalizeDelimiterValue(parsed?.start, "'"),
-          end: normalizeDelimiterValue(parsed?.end, '"')
-        };
-      } catch {
-        return { start: "'", end: '"' };
-      }
-    }
-
-    function persistDelimiterSettings(start, end) {
-      const next = {
-        start: normalizeDelimiterValue(start, "'"),
-        end: normalizeDelimiterValue(end, '"')
-      };
-      state.formatStartDelimiter = next.start;
-      state.formatEndDelimiter = next.end;
-      localStorage.setItem(FORMAT_DELIMITER_SETTINGS_KEY, JSON.stringify(next));
     }
 
     function htmlToPlainText(html) {
@@ -828,15 +758,11 @@ dialog::backdrop{
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const openDelim = normalizeDelimiterValue(state.formatStartDelimiter, "'");
-      const closeDelim = normalizeDelimiterValue(state.formatEndDelimiter, '"');
 
       let html = '';
       let color = '';
       let size = '';
       let spanOpen = false;
-
-      const hasStyle = () => Boolean(color || size);
 
       const currentStyle = () => {
         const styles = [];
@@ -853,73 +779,41 @@ dialog::backdrop{
       };
 
       const openSpan = () => {
-        if (!hasStyle() || spanOpen) return;
-        html += `<span style="${currentStyle()}">`;
+        const style = currentStyle();
+        if (!style) return;
+        html += `<span style="${style}">`;
         spanOpen = true;
       };
 
-      const restartSpan = () => {
+      const reopen = () => {
         closeSpan();
-        openSpan();
-      };
-
-      const appendText = (value) => {
-        if (value === '\n') html += '<br>';
-        else html += esc(value);
+        if (color || size) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
-        const rest = text.slice(i);
+        const ch = text[i];
 
-        if (closeDelim && rest.startsWith(closeDelim) && hasStyle()) {
-          openSpan();
-          html += esc(closeDelim);
-          i += closeDelim.length;
-          closeSpan();
-          color = '';
-          size = '';
-          continue;
-        }
-
-        const colorMatch = rest.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
-          const newColor = `#${colorMatch[1]}`;
-          const after = i + colorMatch[0].length;
-          const hasOpenDelim = openDelim && text.slice(after, after + openDelim.length) === openDelim;
-          color = newColor;
-          if (hasOpenDelim) {
-            restartSpan();
-            i = after + openDelim.length;
-            openSpan();
-            html += esc(openDelim);
-          } else {
-            restartSpan();
-            i = after;
-          }
+          color = `#${colorMatch[1]}`;
+          reopen();
+          i += colorMatch[0].length;
           continue;
         }
 
-        const sizeMatch = rest.match(/^S(\d{1,3})(?!\d)/);
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
         if (sizeMatch) {
-          const newSize = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          const after = i + sizeMatch[0].length;
-          const hasOpenDelim = openDelim && text.slice(after, after + openDelim.length) === openDelim;
-          size = newSize;
-          if (hasOpenDelim) {
-            restartSpan();
-            i = after + openDelim.length;
-            openSpan();
-            html += esc(openDelim);
-          } else {
-            restartSpan();
-            i = after;
-          }
+          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopen();
+          i += sizeMatch[0].length;
           continue;
         }
 
-        if (hasStyle()) openSpan();
+        if (!spanOpen && (color || size)) openSpan();
 
-        appendText(text[i]);
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
+
         i += 1;
       }
 
@@ -928,7 +822,6 @@ dialog::backdrop{
     }
 
     function getCookie(name) {
-
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1455,14 +1348,8 @@ dialog::backdrop{
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
-    function syncHomeSettingsForm() {
-      updateAddBarOpacityLabel();
-      if (formatStartDelimiterInput) formatStartDelimiterInput.value = state.formatStartDelimiter;
-      if (formatEndDelimiterInput) formatEndDelimiterInput.value = state.formatEndDelimiter;
-    }
-
     function openHomeSettingsModal() {
-      syncHomeSettingsForm();
+      updateAddBarOpacityLabel();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1557,9 +1444,8 @@ dialog::backdrop{
 
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      persistDelimiterSettings(formatStartDelimiterInput?.value ?? state.formatStartDelimiter, formatEndDelimiterInput?.value ?? state.formatEndDelimiter);
       if (homeSettingsDialog.open) homeSettingsDialog.close();
-      renderApp();
+      if (state.mode === 'editor') renderApp();
     }
 
     async function saveSiteSettings() {
@@ -1857,18 +1743,20 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const parsedHtml = parseStyledSource(raw) || '<br>';
-      const currentHtml = sanitizeRichHtml(element.innerHTML) || '<br>';
+      const standaloneCommand = getStandaloneStyleCommand(raw);
 
-      if (parsedHtml !== currentHtml) {
-        element.innerHTML = parsedHtml;
-        if (document.activeElement === element) {
-          placeCaretAtEnd(element);
-        }
+      if (standaloneCommand) {
+        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
+        element.blur?.();
+        const selection = window.getSelection?.();
+        if (selection) selection.removeAllRanges();
       }
 
-      state.current.blocks[idx].source = raw;
-      state.current.blocks[idx].html = parsedHtml;
+      const visibleText = element.innerText.replace(/\r/g, '');
+      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
+
+      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
 
@@ -2029,7 +1917,7 @@ dialog::backdrop{
       }
 
       if (target.closest('#homeSettingsCloseBtn')) {
-        saveHomeSettings();
+        if (homeSettingsDialog.open) homeSettingsDialog.close();
         return;
       }
 
@@ -2123,12 +2011,6 @@ dialog::backdrop{
 
       if (target.id === 'addBarOpacityRange') {
         persistAddBarOpacity(Number(target.value) / 100);
-        return;
-      }
-
-      if (target.id === 'formatStartDelimiterInput' || target.id === 'formatEndDelimiterInput') {
-        persistDelimiterSettings(formatStartDelimiterInput?.value ?? state.formatStartDelimiter, formatEndDelimiterInput?.value ?? state.formatEndDelimiter);
-        renderApp();
         return;
       }
 
