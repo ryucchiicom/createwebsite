@@ -467,19 +467,27 @@ dialog::backdrop{
   <dialog id="homeSettingsDialog">
     <div class="dialog-body">
       <h2>画面設定</h2>
-      <p>下の「＋ 追加」バーの透過度を変えられます。今後ここに設定を増やしていけます。</p>
-
+      <p>下の「＋ 追加」バーの透過度と、形式の開始・終了記号を変えられます。</p>
 
   <div class="field">
     <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
+  <div class="field">
+    <label for="formatStartInput">形式の開始記号（複数文字可・改行不可）</label>
+    <input id="formatStartInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="例：'" />
+  </div>
+
+  <div class="field">
+    <label for="formatEndInput">形式の終了記号（複数文字可・改行不可）</label>
+    <input id="formatEndInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder='例："' />
+  </div>
+
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
 </div>
-
 
   </dialog>
 
@@ -635,11 +643,15 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
+    const FORMAT_START_TOKEN_KEY = 'createwebsite:formatStartToken:v1';
+    const FORMAT_END_TOKEN_KEY = 'createwebsite:formatEndToken:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
+    const formatStartInput = document.getElementById('formatStartInput');
+    const formatEndInput = document.getElementById('formatEndInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -699,6 +711,37 @@ dialog::backdrop{
         .replace(/'/g, '&#39;');
     }
 
+    function normalizeFormatToken(value, fallback) {
+      const cleaned = String(value ?? '').replace(/[\r\n]+/g, '');
+      return cleaned.length ? cleaned : fallback;
+    }
+
+    function getFormatTokens() {
+      return {
+        start: normalizeFormatToken(localStorage.getItem(FORMAT_START_TOKEN_KEY), "'"),
+        end: normalizeFormatToken(localStorage.getItem(FORMAT_END_TOKEN_KEY), '"')
+      };
+    }
+
+    function syncFormatTokenInputs() {
+      const tokens = getFormatTokens();
+      if (formatStartInput) formatStartInput.value = tokens.start;
+      if (formatEndInput) formatEndInput.value = tokens.end;
+    }
+
+    function persistFormatTokens(partial = {}) {
+      const current = getFormatTokens();
+      const next = {
+        start: normalizeFormatToken(Object.prototype.hasOwnProperty.call(partial, 'start') ? partial.start : current.start, "'"),
+        end: normalizeFormatToken(Object.prototype.hasOwnProperty.call(partial, 'end') ? partial.end : current.end, '"')
+      };
+      localStorage.setItem(FORMAT_START_TOKEN_KEY, next.start);
+      localStorage.setItem(FORMAT_END_TOKEN_KEY, next.end);
+      if (formatStartInput) formatStartInput.value = next.start;
+      if (formatEndInput) formatEndInput.value = next.end;
+      renderApp();
+    }
+
     function htmlToPlainText(html) {
       const div = document.createElement('div');
       div.innerHTML = String(html ?? '');
@@ -729,45 +772,20 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
-
-      const sizeMatch = text.match(/^S(\d{1,3})'$/);
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
-    }
-
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      const apostrophe = '&#39;';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
-      }
-      return '';
-    }
-
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { start: startToken, end: endToken } = getFormatTokens();
 
       let html = '';
-      let color = '';
-      let size = '';
+      let pendingColor = '';
+      let pendingSize = '';
+      let regionOpen = false;
       let spanOpen = false;
 
-      const currentStyle = () => {
+      const styleString = () => {
         const styles = [];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${size}px`);
+        if (pendingColor) styles.push(`color:${pendingColor}`);
+        if (pendingSize) styles.push(`font-size:${pendingSize}px`);
         return styles.join(';');
       };
 
@@ -779,37 +797,58 @@ dialog::backdrop{
       };
 
       const openSpan = () => {
-        const style = currentStyle();
+        const style = styleString();
         if (!style) return;
         html += `<span style="${style}">`;
         spanOpen = true;
       };
 
-      const reopen = () => {
+      const reopenSpanIfNeeded = () => {
+        if (!regionOpen) return;
         closeSpan();
-        if (color || size) openSpan();
+        openSpan();
       };
+
+      const startsWithToken = (token, index) => Boolean(token) && text.startsWith(token, index);
 
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
         const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          reopen();
+          pendingColor = `#${colorMatch[1]}`;
+          reopenSpanIfNeeded();
           i += colorMatch[0].length;
           continue;
         }
 
         const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
         if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
+          pendingSize = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopenSpanIfNeeded();
           i += sizeMatch[0].length;
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
+        if (!regionOpen && styleString() && startsWithToken(startToken, i)) {
+          html += esc(startToken);
+          regionOpen = true;
+          openSpan();
+          i += startToken.length;
+          continue;
+        }
+
+        if (regionOpen && startsWithToken(endToken, i)) {
+          closeSpan();
+          html += esc(endToken);
+          regionOpen = false;
+          pendingColor = '';
+          pendingSize = '';
+          i += endToken.length;
+          continue;
+        }
+
+        if (regionOpen && !spanOpen) openSpan();
 
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
@@ -822,6 +861,7 @@ dialog::backdrop{
     }
 
     function getCookie(name) {
+
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1350,6 +1390,7 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
+      syncFormatTokenInputs();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1743,24 +1784,30 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
+      const html = parseStyledSource(raw) || '<br>';
 
-      if (standaloneCommand) {
-        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
-        element.blur?.();
-        const selection = window.getSelection?.();
-        if (selection) selection.removeAllRanges();
-      }
-
-      const visibleText = element.innerText.replace(/\r/g, '');
-      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
-
-      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
+
+      const selectionKeep = document.activeElement === element;
+      if (element.innerHTML !== html) {
+        element.innerHTML = html;
+        if (selectionKeep) {
+          const selection = window.getSelection?.();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
+      }
     }
 
     function handleClick(target) {
+
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
@@ -2014,6 +2061,20 @@ dialog::backdrop{
         return;
       }
 
+      if (target.id === 'formatStartInput') {
+        const cleaned = String(target.value || '').replace(/[\r\n]+/g, '');
+        target.value = cleaned;
+        persistFormatTokens({ start: cleaned });
+        return;
+      }
+
+      if (target.id === 'formatEndInput') {
+        const cleaned = String(target.value || '').replace(/[\r\n]+/g, '');
+        target.value = cleaned;
+        persistFormatTokens({ end: cleaned });
+        return;
+      }
+
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2053,6 +2114,7 @@ dialog::backdrop{
     }
 
     function handlePointerDown(event) {
+
       if (state.mode !== 'editor') return;
       const card = event.target.closest('[data-editor-block-card]');
       if (!card) return;
@@ -2173,6 +2235,7 @@ dialog::backdrop{
 
     function bootstrap() {
       updateAddBarOpacityLabel();
+      syncFormatTokenInputs();
       state.mode = 'loading';
       renderApp();
       initFirebase();
