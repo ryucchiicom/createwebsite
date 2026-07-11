@@ -475,6 +475,18 @@ dialog::backdrop{
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
+  <div class="field">
+    <label for="formatOpenInput">開始記号</label>
+    <input id="formatOpenInput" type="text" inputmode="text" placeholder="例：'" />
+  </div>
+
+  <div class="field">
+    <label for="formatCloseInput">終了記号</label>
+    <input id="formatCloseInput" type="text" inputmode="text" placeholder='例："' />
+  </div>
+
+  <p style="color:var(--muted);margin:0 0 10px;line-height:1.7">複数文字可、改行不可</p>
+
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
@@ -635,11 +647,15 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
+    const FORMAT_OPEN_DELIMITER_KEY = 'createwebsite:formatOpenDelimiter:v1';
+    const FORMAT_CLOSE_DELIMITER_KEY = 'createwebsite:formatCloseDelimiter:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
+    const formatOpenInput = document.getElementById('formatOpenInput');
+    const formatCloseInput = document.getElementById('formatCloseInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -678,6 +694,8 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
+      formatOpenDelimiter: normalizeDelimiterInput(localStorage.getItem(FORMAT_OPEN_DELIMITER_KEY), "'"),
+      formatCloseDelimiter: normalizeDelimiterInput(localStorage.getItem(FORMAT_CLOSE_DELIMITER_KEY), '"'),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -756,8 +774,85 @@ dialog::backdrop{
       return '';
     }
 
+    function normalizeDelimiterInput(value, fallback) {
+      const text = String(value ?? '').replace(/\r\n?/g, '');
+      return text.length ? text : fallback;
+    }
+
+    function getFormatDelimiters() {
+      return {
+        open: normalizeDelimiterInput(state.formatOpenDelimiter, "'"),
+        close: normalizeDelimiterInput(state.formatCloseDelimiter, '"')
+      };
+    }
+
+    function getSelectionOffsets(root) {
+      const selection = window.getSelection?.();
+      if (!selection || selection.rangeCount === 0) return null;
+      const range = selection.getRangeAt(0);
+      if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+
+      const before = document.createRange();
+      before.selectNodeContents(root);
+      before.setEnd(range.startContainer, range.startOffset);
+      const start = before.toString().length;
+      const end = start + range.toString().length;
+      return { start, end };
+    }
+
+    function restoreSelectionOffsets(root, start, end = start) {
+      const selection = window.getSelection?.();
+      if (!selection) return;
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let charIndex = 0;
+      let startNode = null;
+      let startOffset = 0;
+      let endNode = null;
+      let endOffset = 0;
+
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const nextIndex = charIndex + node.textContent.length;
+
+        if (!startNode && start <= nextIndex) {
+          startNode = node;
+          startOffset = Math.max(0, start - charIndex);
+        }
+
+        if (startNode && end <= nextIndex) {
+          endNode = node;
+          endOffset = Math.max(0, end - charIndex);
+          break;
+        }
+
+        charIndex = nextIndex;
+      }
+
+      if (!startNode) {
+        const range = document.createRange();
+        range.selectNodeContents(root);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return;
+      }
+
+      if (!endNode) {
+        endNode = startNode;
+        endOffset = startOffset;
+      }
+
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const { open: openDelim, close: closeDelim } = getFormatDelimiters();
 
       let html = '';
       let color = '';
@@ -785,40 +880,89 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const reopen = () => {
+      const emitPlain = (value) => {
         closeSpan();
-        if (color || size) openSpan();
+        html += esc(value);
+      };
+
+      const consumeToken = (prefix, value, nextIndex) => {
+        emitPlain(value);
+        if (openDelim && text.startsWith(openDelim, nextIndex)) {
+          html += esc(openDelim);
+          nextIndex += openDelim.length;
+        }
+        return nextIndex;
       };
 
       for (let i = 0; i < text.length;) {
-        const ch = text[i];
-
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
-        if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          reopen();
-          i += colorMatch[0].length;
+        if (closeDelim && text.startsWith(closeDelim, i)) {
+          closeSpan();
+          html += esc(closeDelim);
+          color = '';
+          size = '';
+          i += closeDelim.length;
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
-        if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
-          i += sizeMatch[0].length;
+        if (text[i] === '#') {
+          const rest = text.slice(i + 1);
+          let hex = '';
+          let hexLen = 0;
+
+          if (/^[0-9a-fA-F]{6}/.test(rest)) {
+            hex = rest.slice(0, 6);
+            hexLen = 6;
+          } else if (/^[0-9a-fA-F]{3}/.test(rest)) {
+            hex = rest.slice(0, 3);
+            hexLen = 3;
+          }
+
+          if (hex) {
+            const token = `#${hex}`;
+            closeSpan();
+            html += esc(token);
+            i += 1 + hexLen;
+            if (openDelim && text.startsWith(openDelim, i)) {
+              html += esc(openDelim);
+              i += openDelim.length;
+            }
+            color = token;
+            continue;
+          }
+        }
+
+        if (text[i] === 'S') {
+          const sizeMatch = text.slice(i + 1).match(/^(\d{1,3})/);
+          if (sizeMatch) {
+            const token = `S${sizeMatch[1]}`;
+            closeSpan();
+            html += esc(token);
+            i += token.length;
+            if (openDelim && text.startsWith(openDelim, i)) {
+              html += esc(openDelim);
+              i += openDelim.length;
+            }
+            size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+            continue;
+          }
+        }
+
+        if (openDelim && text.startsWith(openDelim, i)) {
+          emitPlain(openDelim);
+          i += openDelim.length;
           continue;
         }
 
         if (!spanOpen && (color || size)) openSpan();
 
+        const ch = text[i];
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
-
         i += 1;
       }
 
       closeSpan();
-      return html;
+      return html || '<br>';
     }
 
     function getCookie(name) {
@@ -956,8 +1100,6 @@ dialog::backdrop{
         updatedAt: data.updatedAt || Date.now()
       };
     }
-
-    window.normalizeSite = normalizeSite;
 
     function blockHeightStyle(block) {
       if (!block.heightEnabled) return '';
@@ -1352,6 +1494,8 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
+      if (formatOpenInput) formatOpenInput.value = state.formatOpenDelimiter;
+      if (formatCloseInput) formatCloseInput.value = state.formatCloseDelimiter;
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1446,8 +1590,10 @@ dialog::backdrop{
 
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
+      localStorage.setItem(FORMAT_OPEN_DELIMITER_KEY, state.formatOpenDelimiter);
+      localStorage.setItem(FORMAT_CLOSE_DELIMITER_KEY, state.formatCloseDelimiter);
       if (homeSettingsDialog.open) homeSettingsDialog.close();
-      if (state.mode === 'editor') renderApp();
+      renderApp();
     }
 
     async function saveSiteSettings() {
@@ -1745,19 +1891,21 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
+      const selectionOffsets = document.activeElement === element ? getSelectionOffsets(element) : null;
+      const scrollTop = element.scrollTop;
+      const scrollLeft = element.scrollLeft;
+      const html = parseStyledSource(raw) || '<br>';
 
-      if (standaloneCommand) {
-        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
-        element.blur?.();
-        const selection = window.getSelection?.();
-        if (selection) selection.removeAllRanges();
+      if (element.innerHTML !== html) {
+        element.innerHTML = html;
+        element.scrollTop = scrollTop;
+        element.scrollLeft = scrollLeft;
+        if (selectionOffsets) {
+          requestAnimationFrame(() => restoreSelectionOffsets(element, selectionOffsets.start, selectionOffsets.end));
+        }
       }
 
-      const visibleText = element.innerText.replace(/\r/g, '');
-      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
-
-      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
@@ -1919,7 +2067,7 @@ dialog::backdrop{
       }
 
       if (target.closest('#homeSettingsCloseBtn')) {
-        if (homeSettingsDialog.open) homeSettingsDialog.close();
+        saveHomeSettings();
         return;
       }
 
@@ -2016,6 +2164,22 @@ dialog::backdrop{
         return;
       }
 
+      if (target.id === 'formatOpenInput') {
+        const normalized = normalizeDelimiterInput(target.value, "'");
+        target.value = normalized;
+        state.formatOpenDelimiter = normalized;
+        renderApp();
+        return;
+      }
+
+      if (target.id === 'formatCloseInput') {
+        const normalized = normalizeDelimiterInput(target.value, '"');
+        target.value = normalized;
+        state.formatCloseDelimiter = normalized;
+        renderApp();
+        return;
+      }
+
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2090,7 +2254,7 @@ dialog::backdrop{
 
     homeSettingsDialog.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (homeSettingsDialog.open) homeSettingsDialog.close();
+        saveHomeSettings();
       }
     });
 
