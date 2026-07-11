@@ -475,6 +475,16 @@ dialog::backdrop{
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
+  <div class="field">
+    <label for="formatStartInput">開始記号（複数文字可、改行不可）</label>
+    <input id="formatStartInput" type="text" placeholder="例：'" />
+  </div>
+
+  <div class="field">
+    <label for="formatEndInput">終了記号（複数文字可、改行不可）</label>
+    <input id="formatEndInput" type="text" placeholder='例："' />
+  </div>
+
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
@@ -635,11 +645,17 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
+    const FORMAT_START_KEY = 'createwebsite:formatStart:v1';
+    const FORMAT_END_KEY = 'createwebsite:formatEnd:v1';
+    const DEFAULT_FORMAT_START = "'";
+    const DEFAULT_FORMAT_END = '"';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
+    const formatStartInput = document.getElementById('formatStartInput');
+    const formatEndInput = document.getElementById('formatEndInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -678,6 +694,8 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
+      formatStart: normalizeMarkerSetting(localStorage.getItem(FORMAT_START_KEY), DEFAULT_FORMAT_START),
+      formatEnd: normalizeMarkerSetting(localStorage.getItem(FORMAT_END_KEY), DEFAULT_FORMAT_END),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -758,8 +776,12 @@ dialog::backdrop{
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const openMarker = "'";
-      const closeMarker = '"';
+      const startMarker = normalizeMarkerSetting(state.formatStart, DEFAULT_FORMAT_START);
+      const endMarker = normalizeMarkerSetting(state.formatEnd, DEFAULT_FORMAT_END);
+      const startLen = startMarker.length;
+      const endLen = endMarker.length;
+      const colorCommandPattern = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/;
+      const sizeCommandPattern = /^S(\d{1,3})/;
 
       let html = '';
       let color = '';
@@ -787,59 +809,47 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const reopen = () => {
-        closeSpan();
-        if (color || size) openSpan();
+      const emitPlain = (value) => {
+        if (!value) return;
+        html += esc(value);
       };
 
       for (let i = 0; i < text.length;) {
         const rest = text.slice(i);
 
-        const colorMatch = rest.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
-        if (colorMatch) {
+        const colorMatch = rest.match(colorCommandPattern);
+        if (colorMatch && startMarker && rest.startsWith(startMarker, colorMatch[0].length)) {
           closeSpan();
+          emitPlain(colorMatch[0]);
+          emitPlain(startMarker);
           color = `#${colorMatch[1]}`;
-          i += colorMatch[0].length;
-          if (text.startsWith(openMarker, i)) {
-            html += esc(openMarker);
-            i += openMarker.length;
-          }
-          if (color || size) openSpan();
+          i += colorMatch[0].length + startLen;
           continue;
         }
 
-        const sizeMatch = rest.match(/^S(\d{1,3})(?!\d)/);
-        if (sizeMatch) {
+        const sizeMatch = rest.match(sizeCommandPattern);
+        if (sizeMatch && startMarker && rest.startsWith(startMarker, sizeMatch[0].length)) {
           closeSpan();
+          emitPlain(sizeMatch[0]);
+          emitPlain(startMarker);
           size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          i += sizeMatch[0].length;
-          if (text.startsWith(openMarker, i)) {
-            html += esc(openMarker);
-            i += openMarker.length;
-          }
-          if (color || size) openSpan();
+          i += sizeMatch[0].length + startLen;
           continue;
         }
 
-        if (text.startsWith(closeMarker, i)) {
+        if (endMarker && rest.startsWith(endMarker)) {
           closeSpan();
-          html += esc(closeMarker);
+          emitPlain(endMarker);
           color = '';
           size = '';
-          i += closeMarker.length;
+          i += endLen;
           continue;
         }
 
-        if (text.startsWith(openMarker, i)) {
-          if (spanOpen) {
-            const activeStyle = currentStyle();
-            closeSpan();
-            html += esc(openMarker);
-            if (activeStyle) openSpan();
-          } else {
-            html += esc(openMarker);
-          }
-          i += openMarker.length;
+        if (startMarker && rest.startsWith(startMarker)) {
+          closeSpan();
+          emitPlain(startMarker);
+          i += startLen;
           continue;
         }
 
@@ -848,7 +858,6 @@ dialog::backdrop{
         const ch = text[i];
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
-
         i += 1;
       }
 
@@ -960,15 +969,45 @@ dialog::backdrop{
       addBarOpacityRange.value = String(percent);
     }
 
+    function normalizeMarkerSetting(value, fallback) {
+      const cleaned = String(value ?? '').replace(/\r\n?/g, '');
+
+      return cleaned.length ? cleaned : fallback;
+    }
+
+    function updateFormatMarkerInputs() {
+      if (formatStartInput) formatStartInput.value = state.formatStart;
+      if (formatEndInput) formatEndInput.value = state.formatEnd;
+    }
+
+    function persistFormatMarkers(startValue = state.formatStart, endValue = state.formatEnd) {
+      state.formatStart = normalizeMarkerSetting(startValue, DEFAULT_FORMAT_START);
+      state.formatEnd = normalizeMarkerSetting(endValue, DEFAULT_FORMAT_END);
+      localStorage.setItem(FORMAT_START_KEY, state.formatStart);
+      localStorage.setItem(FORMAT_END_KEY, state.formatEnd);
+      updateFormatMarkerInputs();
+      if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
+    }
+
     function normalizeBlock(block = {}) {
       const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
-      const html = source
+      const hasSyntax = Boolean(
+        source && (
+          source.includes(normalizeMarkerSetting(state.formatStart, DEFAULT_FORMAT_START)) ||
+          source.includes(normalizeMarkerSetting(state.formatEnd, DEFAULT_FORMAT_END)) ||
+          /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/.test(source) ||
+          /S\d{1,3}/.test(source)
+        )
+      );
+      const html = hasSyntax
         ? parseStyledSource(source)
-        : sanitizeRichHtml(block.html || '') || '<br>';
+        : (typeof block.html === 'string' && block.html.trim()
+          ? sanitizeRichHtml(block.html)
+          : parseStyledSource(source));
 
       return {
         id: block.id || uid8(),
-        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
+        source,
         html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
@@ -1386,6 +1425,7 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
+      updateFormatMarkerInputs();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1480,8 +1520,10 @@ dialog::backdrop{
 
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
+      localStorage.setItem(FORMAT_START_KEY, state.formatStart);
+      localStorage.setItem(FORMAT_END_KEY, state.formatEnd);
       if (homeSettingsDialog.open) homeSettingsDialog.close();
-      if (state.mode === 'editor') renderApp();
+      if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
     }
 
     async function saveSiteSettings() {
@@ -1779,6 +1821,7 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
+
       const html = parseStyledSource(raw) || '<br>';
 
       state.current.blocks[idx].source = raw;
@@ -1943,7 +1986,7 @@ dialog::backdrop{
       }
 
       if (target.closest('#homeSettingsCloseBtn')) {
-        if (homeSettingsDialog.open) homeSettingsDialog.close();
+        saveHomeSettings();
         return;
       }
 
@@ -2037,6 +2080,16 @@ dialog::backdrop{
 
       if (target.id === 'addBarOpacityRange') {
         persistAddBarOpacity(Number(target.value) / 100);
+        return;
+      }
+
+      if (target.id === 'formatStartInput') {
+        persistFormatMarkers(target.value, state.formatEnd);
+        return;
+      }
+
+      if (target.id === 'formatEndInput') {
+        persistFormatMarkers(state.formatStart, target.value);
         return;
       }
 
