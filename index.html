@@ -475,16 +475,6 @@ dialog::backdrop{
     <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
   </div>
 
-  <div class="field">
-    <label for="styleOpenMarkerInput">開始記号</label>
-    <input id="styleOpenMarkerInput" type="text" value="'" maxlength="16" />
-  </div>
-
-  <div class="field">
-    <label for="styleCloseMarkerInput">終了記号</label>
-    <input id="styleCloseMarkerInput" type="text" value="&quot;" maxlength="16" />
-  </div>
-
   <div class="toolbar">
     <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
   </div>
@@ -645,15 +635,11 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const STYLE_OPEN_MARKER_KEY = 'createwebsite:styleOpenMarker:v1';
-    const STYLE_CLOSE_MARKER_KEY = 'createwebsite:styleCloseMarker:v1';
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
-    const styleOpenMarkerInput = document.getElementById('styleOpenMarkerInput');
-    const styleCloseMarkerInput = document.getElementById('styleCloseMarkerInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -692,8 +678,6 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      styleOpenMarker: localStorage.getItem(STYLE_OPEN_MARKER_KEY) ?? "'",
-      styleCloseMarker: localStorage.getItem(STYLE_CLOSE_MARKER_KEY) ?? '"',
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -745,31 +729,14 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-
-    function cleanMarkerValue(value, fallback) {
-      const cleaned = String(value ?? '').replace(/[\r\n]/g, '');
-      return cleaned.length ? cleaned : fallback;
-    }
-
-    function currentStyleMarkers() {
-      return {
-        open: cleanMarkerValue(state.styleOpenMarker, "'"),
-        close: cleanMarkerValue(state.styleCloseMarker, '"')
-      };
-    }
-
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const { open } = currentStyleMarkers();
-      if (!open || !text.endsWith(open)) return null;
-      const body = text.slice(0, -open.length);
-
-      const colorMatch = body.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = body.match(/^S(\d{1,3})$/);
+      const sizeMatch = text.match(/^S(\d{1,3})'$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
       }
@@ -779,12 +746,18 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
-      return esc(currentStyleMarkers().open);
+      const apostrophe = '&#39;';
+      if (command.type === 'color') {
+        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
+      }
+      if (command.type === 'size') {
+        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
+      }
+      return '';
     }
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const { open: openMarker, close: closeMarker } = currentStyleMarkers();
 
       let html = '';
       let color = '';
@@ -812,70 +785,35 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const syncSpan = () => {
+      const reopen = () => {
         closeSpan();
         if (color || size) openSpan();
       };
 
-      const applyColor = (value) => {
-        color = value;
-        syncSpan();
-      };
-
-      const applySize = (value) => {
-        size = value;
-        syncSpan();
-      };
-
-      const startsWithAt = (needle, index) => Boolean(needle) && text.startsWith(needle, index);
-
       for (let i = 0; i < text.length;) {
-        if (startsWithAt(closeMarker, i)) {
-          closeSpan();
-          html += esc(closeMarker);
-          color = '';
-          size = '';
-          i += closeMarker.length;
-          continue;
-        }
+        const ch = text[i];
 
-        const remaining = text.slice(i);
-        const colorMatch = remaining.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
-          const afterToken = i + colorMatch[0].length;
-          const hasOpenMarker = startsWithAt(openMarker, afterToken);
-          applyColor(`#${colorMatch[1]}`);
-          if (hasOpenMarker) {
-            closeSpan();
-            html += esc(openMarker);
-            i = afterToken + openMarker.length;
-            syncSpan();
-          } else {
-            i = afterToken;
-          }
+          color = `#${colorMatch[1]}`;
+          reopen();
+          i += colorMatch[0].length;
           continue;
         }
 
-        const sizeMatch = remaining.match(/^S(\d{1,3})(?!\d)/);
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
         if (sizeMatch) {
-          const afterToken = i + sizeMatch[0].length;
-          const hasOpenMarker = startsWithAt(openMarker, afterToken);
-          applySize(String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))));
-          if (hasOpenMarker) {
-            closeSpan();
-            html += esc(openMarker);
-            i = afterToken + openMarker.length;
-            syncSpan();
-          } else {
-            i = afterToken;
-          }
+          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+          reopen();
+          i += sizeMatch[0].length;
           continue;
         }
 
         if (!spanOpen && (color || size)) openSpan();
 
-        const ch = text[i];
-        html += ch === '\n' ? '<br>' : esc(ch);
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
+
         i += 1;
       }
 
@@ -988,12 +926,13 @@ dialog::backdrop{
     }
 
     function normalizeBlock(block = {}) {
-      const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
-      const html = parseStyledSource(source || '');
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
 
       return {
         id: block.id || uid8(),
-        source,
+        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
         html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
@@ -1411,8 +1350,6 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
-      styleOpenMarkerInput.value = currentStyleMarkers().open;
-      styleCloseMarkerInput.value = currentStyleMarkers().close;
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1667,17 +1604,14 @@ dialog::backdrop{
       state.current.updatedAt = Date.now();
       state.current.ownerUid = state.current.ownerUid || state.uid;
       state.current.creatorId = state.current.creatorId || creatorId();
-      state.current.blocks = (state.current.blocks || []).map((block) => ({
-        ...normalizeBlock(block),
-        source: String(block.source || htmlToPlainText(block.html || ''))
-      }));
+      state.current.blocks = (state.current.blocks || []).map(normalizeBlock);
 
       const payload = {
         ...state.current,
         blocks: state.current.blocks.map((b) => ({
           id: b.id,
-          source: String(b.source || ''),
-          html: parseStyledSource(String(b.source || '')),
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
           visible: b.visible !== false,
           wrap: b.wrap !== false,
           heightEnabled: b.heightEnabled === true,
@@ -2080,22 +2014,6 @@ dialog::backdrop{
         return;
       }
 
-      if (target.id === 'styleOpenMarkerInput') {
-        const value = cleanMarkerValue(target.value, "'");
-        state.styleOpenMarker = value;
-        localStorage.setItem(STYLE_OPEN_MARKER_KEY, value);
-        target.value = value;
-        return;
-      }
-
-      if (target.id === 'styleCloseMarkerInput') {
-        const value = cleanMarkerValue(target.value, '"');
-        state.styleCloseMarker = value;
-        localStorage.setItem(STYLE_CLOSE_MARKER_KEY, value);
-        target.value = value;
-        return;
-      }
-
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2255,14 +2173,11 @@ dialog::backdrop{
 
     function bootstrap() {
       updateAddBarOpacityLabel();
-      state.styleOpenMarker = cleanMarkerValue(state.styleOpenMarker, "'");
-      state.styleCloseMarker = cleanMarkerValue(state.styleCloseMarker, '"');
-      localStorage.setItem(STYLE_OPEN_MARKER_KEY, state.styleOpenMarker);
-      localStorage.setItem(STYLE_CLOSE_MARKER_KEY, state.styleCloseMarker);
       state.mode = 'loading';
       renderApp();
       initFirebase();
     }
+
     bootstrap();
   </script>
 
