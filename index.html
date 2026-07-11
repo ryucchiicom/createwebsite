@@ -764,6 +764,7 @@ dialog::backdrop{
       let size = '';
       let spanOpen = false;
       let plainUntilQuote = false;
+      let plainModeSnapshot = null;
 
       const currentStyle = () => {
         const styles = [];
@@ -791,18 +792,47 @@ dialog::backdrop{
         if (color || size) openSpan();
       };
 
+      const renderPlainChar = (ch) => {
+        if (ch === '\n') html += '<br>';
+        else html += esc(ch);
+      };
+
+      const beginPlainMode = () => {
+        if (plainUntilQuote) return;
+        plainModeSnapshot = { color, size };
+        plainUntilQuote = true;
+        closeSpan();
+      };
+
+      const endPlainMode = () => {
+        plainUntilQuote = false;
+        const snapshot = plainModeSnapshot;
+        plainModeSnapshot = null;
+        if (!snapshot) return;
+        color = snapshot.color || '';
+        size = snapshot.size || '';
+        if (color || size) openSpan();
+      };
+
+      const hasFutureQuote = (fromIndex) => text.indexOf('"', fromIndex) !== -1;
+
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
         if (plainUntilQuote) {
+          renderPlainChar(ch);
+          i += 1;
           if (ch === '"') {
-            html += esc(ch);
-            plainUntilQuote = false;
-          } else if (ch === '\n') {
-            html += '<br>';
-          } else {
-            html += esc(ch);
+            endPlainMode();
           }
+          continue;
+        }
+
+        if (ch === '€') {
+          if (hasFutureQuote(i + 1)) {
+            beginPlainMode();
+          }
+          renderPlainChar(ch);
           i += 1;
           continue;
         }
@@ -815,7 +845,7 @@ dialog::backdrop{
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})(?!\d)/);
         if (sizeMatch) {
           size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
           reopen();
@@ -823,28 +853,29 @@ dialog::backdrop{
           continue;
         }
 
-        if (ch === '€') {
-          closeSpan();
-          color = '';
-          size = '';
-          html += esc(ch);
-          plainUntilQuote = text.indexOf('\"', i + 1) !== -1;
+        if (ch === '"') {
+          if (color || size || spanOpen) {
+            if (!spanOpen && (color || size)) openSpan();
+            renderPlainChar(ch);
+            closeSpan();
+            color = '';
+            size = '';
+          } else {
+            renderPlainChar(ch);
+          }
           i += 1;
           continue;
         }
 
         if (!spanOpen && (color || size)) openSpan();
 
-        if (ch === '\n') html += '<br>';
-        else html += esc(ch);
-
+        renderPlainChar(ch);
         i += 1;
       }
 
       closeSpan();
       return html;
     }
-
 
     function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
