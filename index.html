@@ -746,14 +746,7 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
-      const apostrophe = '&#39;';
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
-      }
-      return '';
+      return '&#39;';
     }
 
     function parseStyledSource(input) {
