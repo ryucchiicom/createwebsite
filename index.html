@@ -731,12 +731,12 @@ dialog::backdrop{
 
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
+      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = text.match(/S(\d{1,3})'$/);
+      const sizeMatch = text.match(/^S(\d{1,3})'$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
       }
@@ -758,6 +758,8 @@ dialog::backdrop{
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const openMarker = "'";
+      const closeMarker = '"';
 
       let html = '';
       let color = '';
@@ -785,45 +787,65 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const emitPlainApostrophe = () => {
-        html += '&#39;';
+      const reopen = () => {
+        closeSpan();
+        if (color || size) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
-        const ch = text[i];
+        const rest = text.slice(i);
 
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})'/);
+        const colorMatch = rest.match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
         if (colorMatch) {
           closeSpan();
-          emitPlainApostrophe();
           color = `#${colorMatch[1]}`;
-          openSpan();
           i += colorMatch[0].length;
+          if (text.startsWith(openMarker, i)) {
+            html += esc(openMarker);
+            i += openMarker.length;
+          }
+          if (color || size) openSpan();
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})'/);
+        const sizeMatch = rest.match(/^S(\d{1,3})(?!\d)/);
         if (sizeMatch) {
           closeSpan();
-          emitPlainApostrophe();
           size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          openSpan();
           i += sizeMatch[0].length;
+          if (text.startsWith(openMarker, i)) {
+            html += esc(openMarker);
+            i += openMarker.length;
+          }
+          if (color || size) openSpan();
           continue;
         }
 
-        if (ch === "'") {
+        if (text.startsWith(closeMarker, i)) {
           closeSpan();
-          emitPlainApostrophe();
+          html += esc(closeMarker);
           color = '';
           size = '';
-          i += 1;
+          i += closeMarker.length;
           continue;
         }
 
-        if ((color || size) && !spanOpen) openSpan();
-        if (!color && !size && spanOpen) closeSpan();
+        if (text.startsWith(openMarker, i)) {
+          if (spanOpen) {
+            const activeStyle = currentStyle();
+            closeSpan();
+            html += esc(openMarker);
+            if (activeStyle) openSpan();
+          } else {
+            html += esc(openMarker);
+          }
+          i += openMarker.length;
+          continue;
+        }
 
+        if (!spanOpen && (color || size)) openSpan();
+
+        const ch = text[i];
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
 
@@ -939,9 +961,10 @@ dialog::backdrop{
     }
 
     function normalizeBlock(block = {}) {
-      const html = typeof block.html === 'string' && block.html.trim()
-        ? sanitizeRichHtml(block.html)
-        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
+      const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
+      const html = source
+        ? parseStyledSource(source)
+        : sanitizeRichHtml(block.html || '') || '<br>';
 
       return {
         id: block.id || uid8(),
@@ -1756,26 +1779,7 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
-      const hasStyledHtml = /<span\b[^>]*style\s*=|style\s*=/.test(element.innerHTML);
-      const hasApostropheControl = raw.includes("'") && (standaloneCommand || hasStyledHtml);
-      const shouldRerender = Boolean(standaloneCommand || hasApostropheControl);
-
-      if (shouldRerender) {
-        const rendered = parseStyledSource(raw) || '<br>';
-        element.innerHTML = rendered;
-        const selection = window.getSelection?.();
-        if (selection) {
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          range.collapse(false);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-        element.blur?.();
-      }
-
-      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
+      const html = parseStyledSource(raw) || '<br>';
 
       state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html;
