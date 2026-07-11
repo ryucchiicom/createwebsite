@@ -731,12 +731,12 @@ dialog::backdrop{
 
     function getStandaloneStyleCommand(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
+      const colorMatch = text.match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})'$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = text.match(/^S(\d{1,3})'$/);
+      const sizeMatch = text.match(/S(\d{1,3})'$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
       }
@@ -746,7 +746,14 @@ dialog::backdrop{
 
     function renderStandaloneStyleCommand(command) {
       if (!command) return '';
-      return '&#39;';
+      const apostrophe = '&#39;';
+      if (command.type === 'color') {
+        return `<span style="color:${esc(command.value)}">${apostrophe}</span>`;
+      }
+      if (command.type === 'size') {
+        return `<span style="font-size:${esc(command.value)}px">${apostrophe}</span>`;
+      }
+      return '';
     }
 
     function parseStyledSource(input) {
@@ -778,31 +785,44 @@ dialog::backdrop{
         spanOpen = true;
       };
 
-      const reopen = () => {
-        closeSpan();
-        if (color || size) openSpan();
+      const emitPlainApostrophe = () => {
+        html += '&#39;';
       };
 
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
-        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})'/);
         if (colorMatch) {
+          closeSpan();
+          emitPlainApostrophe();
           color = `#${colorMatch[1]}`;
-          reopen();
+          openSpan();
           i += colorMatch[0].length;
           continue;
         }
 
-        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})'/);
         if (sizeMatch) {
+          closeSpan();
+          emitPlainApostrophe();
           size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          reopen();
+          openSpan();
           i += sizeMatch[0].length;
           continue;
         }
 
-        if (!spanOpen && (color || size)) openSpan();
+        if (ch === "'") {
+          closeSpan();
+          emitPlainApostrophe();
+          color = '';
+          size = '';
+          i += 1;
+          continue;
+        }
+
+        if ((color || size) && !spanOpen) openSpan();
+        if (!color && !size && spanOpen) closeSpan();
 
         if (ch === '\n') html += '<br>';
         else html += esc(ch);
@@ -1737,18 +1757,27 @@ dialog::backdrop{
 
       const raw = element.innerText.replace(/\r/g, '');
       const standaloneCommand = getStandaloneStyleCommand(raw);
+      const hasStyledHtml = /<span\b[^>]*style\s*=|style\s*=/.test(element.innerHTML);
+      const hasApostropheControl = raw.includes("'") && (standaloneCommand || hasStyledHtml);
+      const shouldRerender = Boolean(standaloneCommand || hasApostropheControl);
 
-      if (standaloneCommand) {
-        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
-        element.blur?.();
+      if (shouldRerender) {
+        const rendered = parseStyledSource(raw) || '<br>';
+        element.innerHTML = rendered;
         const selection = window.getSelection?.();
-        if (selection) selection.removeAllRanges();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        element.blur?.();
       }
 
-      const visibleText = element.innerText.replace(/\r/g, '');
       const html = sanitizeRichHtml(element.innerHTML) || '<br>';
 
-      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
