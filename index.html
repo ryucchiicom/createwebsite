@@ -871,7 +871,6 @@ function renderStandaloneStyleCommand(command) {
   return '';
 }
 
-
 function parseStyledSource(input) {
   const text = String(input ?? '').replace(/\r\n?/g, '\n');
   const tokens = currentFormatTokens();
@@ -880,7 +879,6 @@ function parseStyledSource(input) {
   let color = '';
   let size = '';
   let spanOpen = false;
-  let lastStyle = '';
 
   const currentStyle = () => {
     const styles = [];
@@ -894,20 +892,21 @@ function parseStyledSource(input) {
       html += '</span>';
       spanOpen = false;
     }
-    lastStyle = '';
   };
 
-  const syncSpan = () => {
+  const openSpan = () => {
     const style = currentStyle();
-    if (!style) {
-      closeSpan();
-      return;
-    }
-    if (spanOpen && style === lastStyle) return;
-    closeSpan();
+    if (!style) return;
     html += `<span style="${style}">`;
     spanOpen = true;
-    lastStyle = style;
+  };
+
+  const ensureSpan = () => {
+    if (color || size) {
+      if (!spanOpen) openSpan();
+    } else {
+      closeSpan();
+    }
   };
 
   for (let i = 0; i < text.length;) {
@@ -932,14 +931,14 @@ function parseStyledSource(input) {
 
       if (command.type === 'color') {
         color = command.value;
-        syncSpan();
+        ensureSpan();
         i += command.length;
         continue;
       }
 
       if (command.type === 'size') {
         size = command.value;
-        syncSpan();
+        ensureSpan();
         i += command.length;
         continue;
       }
@@ -949,7 +948,7 @@ function parseStyledSource(input) {
     if (ch === '\n') {
       html += '<br>';
     } else {
-      syncSpan();
+      ensureSpan();
       html += esc(ch);
     }
 
@@ -960,7 +959,7 @@ function parseStyledSource(input) {
   return html || '<br>';
 }
 
-function getCookie(name) {
+    function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1877,85 +1876,31 @@ function getCookie(name) {
       focusBlockEditor(block.id);
     }
 
-
-function getCaretOffsetWithinElement(element) {
-  if (!element) return null;
-  const selection = window.getSelection?.();
-  if (!selection || selection.rangeCount === 0) return null;
-
-  const range = selection.getRangeAt(0);
-  if (!element.contains(range.startContainer)) return null;
-
-  const preRange = document.createRange();
-  preRange.selectNodeContents(element);
-  preRange.setEnd(range.startContainer, range.startOffset);
-  return preRange.toString().length;
-}
-
-function setCaretOffsetWithinElement(element, offset) {
-  if (!element || !Number.isFinite(offset)) return;
-
-  const selection = window.getSelection?.();
-  if (!selection) return;
-
-  const targetOffset = Math.max(0, Math.floor(offset));
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  const range = document.createRange();
-  let remaining = targetOffset;
-  let node = walker.nextNode();
-
-  while (node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const len = node.nodeValue?.length || 0;
-      if (remaining <= len) {
-        range.setStart(node, remaining);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return;
-      }
-      remaining -= len;
-    } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
-      if (remaining <= 1) {
-        range.setStartBefore(node);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return;
-      }
-      remaining -= 1;
-    }
-
-    node = walker.nextNode();
-  }
-
-  range.selectNodeContents(element);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
-
-
-function updateEditableBlockFromDom(blockId, element) {
+    function updateEditableBlockFromDom(blockId, element) {
       if (!state.current || !blockId || !element) return;
       const idx = state.current.blocks.findIndex((b) => b.id === blockId);
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const caretOffset = getCaretOffsetWithinElement(element);
       const standaloneCommand = getStandaloneStyleCommand(raw);
       let html = parseStyledSource(raw) || '<br>';
+      const previousHtml = element.innerHTML;
 
       if (standaloneCommand && raw === raw.trim()) {
         html = renderStandaloneStyleCommand(standaloneCommand);
       }
 
-      if (element.innerHTML !== html) {
+      if (html !== previousHtml) {
         element.innerHTML = html;
+        if (!(standaloneCommand && raw === raw.trim())) {
+          requestAnimationFrame(() => placeCaretAtEnd(element));
+        }
       }
 
-      if (caretOffset !== null) {
-        setCaretOffsetWithinElement(element, caretOffset);
+      if (standaloneCommand && raw === raw.trim()) {
+        element.blur?.();
+        const selection = window.getSelection?.();
+        if (selection) selection.removeAllRanges();
       }
 
       state.current.blocks[idx].source = raw;
@@ -1963,7 +1908,7 @@ function updateEditableBlockFromDom(blockId, element) {
       state.currentSaved = false;
     }
 
-function handleClick(target) {
+    function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
