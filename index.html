@@ -470,7 +470,7 @@ dialog::backdrop{
     <p>下の「＋ 追加」バーの透過度と、形式に使う文字を変えられます。複数文字可・改行不可です。</p>
 
     <div class="field">
-      <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
+      <label for="addBarOpacityRange">UIの不透明度：<span id="addBarOpacityValue">92%</span></label>
       <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
     </div>
 
@@ -841,7 +841,7 @@ function readFormatCommandAt(text, index, tokens) {
 }
 
 function getStandaloneStyleCommand(input) {
-  const text = String(input ?? '').replace(/\r\n?/g, '\n');
+  const text = String(input ?? '').replace(/\r\n?/g, '\n').trim();
   const tokens = currentFormatTokens();
   const startToken = escapeRegExp(tokens.start);
 
@@ -913,10 +913,10 @@ function parseStyledSource(input) {
     const command = readFormatCommandAt(text, i, tokens);
     if (command) {
       if (command.type === 'plain') {
-        const wasOpen = spanOpen;
-        if (wasOpen) closeSpan();
+        closeSpan();
         html += esc(text.slice(i, i + command.length));
-        if (wasOpen) openSpan();
+        color = '';
+        size = '';
         i += command.length;
         continue;
       }
@@ -1882,10 +1882,11 @@ function parseStyledSource(input) {
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
+      const trimmedRaw = raw.trim();
+      const standaloneCommand = getStandaloneStyleCommand(trimmedRaw);
       let html = parseStyledSource(raw) || '<br>';
 
-      if (standaloneCommand && raw === raw.trim()) {
+      if (standaloneCommand && trimmedRaw) {
         html = renderStandaloneStyleCommand(standaloneCommand);
         element.innerHTML = html;
         element.blur?.();
