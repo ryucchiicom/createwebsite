@@ -763,7 +763,7 @@ dialog::backdrop{
       let color = '';
       let size = '';
       let spanOpen = false;
-      let plainTextMode = false;
+      let plainMode = false;
 
       const currentStyle = () => {
         const styles = [];
@@ -781,22 +781,22 @@ dialog::backdrop{
 
       const openSpan = () => {
         const style = currentStyle();
-        if (!style || plainTextMode) return;
+        if (!style) return;
         html += `<span style="${style}">`;
         spanOpen = true;
       };
 
       const reopen = () => {
         closeSpan();
-        if (!plainTextMode && (color || size)) openSpan();
+        if (color || size) openSpan();
       };
 
       for (let i = 0; i < text.length;) {
         const ch = text[i];
 
-        if (plainTextMode) {
+        if (plainMode) {
           if (ch === '"') {
-            plainTextMode = false;
+            plainMode = false;
             i += 1;
             continue;
           }
@@ -809,10 +809,13 @@ dialog::backdrop{
         }
 
         if (ch === '€') {
-          color = '';
-          size = '';
-          plainTextMode = true;
+          plainMode = true;
           closeSpan();
+          i += 1;
+          continue;
+        }
+
+        if (ch === '"') {
           html += esc(ch);
           i += 1;
           continue;
@@ -1775,6 +1778,11 @@ dialog::backdrop{
         element.blur?.();
         const selection = window.getSelection?.();
         if (selection) selection.removeAllRanges();
+      } else if (raw.includes('€')) {
+        const nextHtml = parseStyledSource(raw) || '<br>';
+        if (element.innerHTML !== nextHtml) {
+          element.innerHTML = nextHtml;
+        }
       }
 
       const visibleText = element.innerText.replace(/\r/g, '');
