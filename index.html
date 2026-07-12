@@ -157,15 +157,6 @@ p{color:var(--muted);line-height:1.8}
   align-items:center;
   margin-bottom:12px;
 }
-.fixed-top-btn{
-  position:fixed;
-  top:12px;
-  left:12px;
-  z-index:120;
-  box-shadow:var(--shadow);
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-}
 
 .field{display:grid;gap:7px;margin:12px 0}
 .field label{font-weight:800;font-size:.92rem}
@@ -467,32 +458,37 @@ dialog::backdrop{
   <dialog id="homeSettingsDialog">
     <div class="dialog-body">
       <h2>画面設定</h2>
-      <p>下の「＋ 追加」バーの透過度を変えられます。ここで形式用の記号も変えられます。</p>
+      <p>下の「＋ 追加」バーの透過度を変えられます。今後ここに設定を増やしていけます。</p>
 
-      <div class="field">
-        <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
-        <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
-      </div>
 
-      <div class="field">
-        <label for="styleOpenTokenInput">開始記号（既定は '）</label>
-        <input id="styleOpenTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="'" />
-      </div>
+  <div class="field">
+    <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
+    <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
+  </div>
 
-      <div class="field">
-        <label for="styleCloseTokenInput">終了記号（既定は "）</label>
-        <input id="styleCloseTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="&quot;" />
-      </div>
+  <div class="field">
+    <label for="formatOpenTokenInput">形式開始記号</label>
+    <input id="formatOpenTokenInput" type="text" placeholder="'" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  </div>
 
-      <div class="field">
-        <label for="stylePlainTokenInput">解除記号（既定は €）</label>
-        <input id="stylePlainTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="€" />
-      </div>
+  <div class="field">
+    <label for="formatCloseTokenInput">形式終了記号</label>
+    <input id="formatCloseTokenInput" type="text" placeholder="&quot;" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  </div>
 
-      <div class="toolbar">
-        <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
-      </div>
-    </div>
+  <div class="field">
+    <label for="formatPlainTokenInput">形式解除記号</label>
+    <input id="formatPlainTokenInput" type="text" placeholder="€" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  </div>
+
+  <p class="notice" style="margin-top:6px">改行は使えません。複数文字はOKです。</p>
+
+  <div class="toolbar">
+    <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
+  </div>
+</div>
+
+
   </dialog>
 
   <dialog id="siteSettingsDialog">
@@ -647,22 +643,21 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const STYLE_TOKEN_KEY = 'createwebsite:styleTokens:v1';
-    const DEFAULT_STYLE_TOKENS = { open: "'", close: '"', plain: '€' };
+    const FORMAT_TOKENS_KEY = 'createwebsite:formatTokens:v1';
+    const DEFAULT_FORMAT_TOKENS = { open: "'", close: '"', plain: '€' };
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
-    const styleOpenTokenInput = document.getElementById('styleOpenTokenInput');
-    const styleCloseTokenInput = document.getElementById('styleCloseTokenInput');
-    const stylePlainTokenInput = document.getElementById('stylePlainTokenInput');
+    const formatOpenTokenInput = document.getElementById('formatOpenTokenInput');
+    const formatCloseTokenInput = document.getElementById('formatCloseTokenInput');
+    const formatPlainTokenInput = document.getElementById('formatPlainTokenInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
     const siteDeleteBtn = document.getElementById('siteDeleteBtn');
     const siteClearKeyBtn = document.getElementById('siteClearKeyBtn');
-    const siteSettingsSaveBtn = document.getElementById('siteSettingsSaveBtn');
     const blockSettingsDialog = document.getElementById('blockSettingsDialog');
     const blockVisibleToggle = document.getElementById('blockVisibleToggle');
     const blockWrapToggle = document.getElementById('blockWrapToggle');
@@ -695,19 +690,21 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      moveBlockId: null,
-      pendingSiteDelete: false,
-      styleTokens: (() => {
+      formatTokens: (() => {
         try {
-          const raw = JSON.parse(localStorage.getItem(STYLE_TOKEN_KEY) || 'null');
-          const open = String(raw?.open ?? DEFAULT_STYLE_TOKENS.open).replace(/[\r\n]/g, '') || DEFAULT_STYLE_TOKENS.open;
-          const close = String(raw?.close ?? DEFAULT_STYLE_TOKENS.close).replace(/[\r\n]/g, '') || DEFAULT_STYLE_TOKENS.close;
-          const plain = String(raw?.plain ?? DEFAULT_STYLE_TOKENS.plain).replace(/[\r\n]/g, '') || DEFAULT_STYLE_TOKENS.plain;
-          return { open, close, plain };
+          const raw = localStorage.getItem(FORMAT_TOKENS_KEY);
+          if (!raw) return { ...DEFAULT_FORMAT_TOKENS };
+          const parsed = JSON.parse(raw);
+          return {
+            open: String(parsed?.open ?? DEFAULT_FORMAT_TOKENS.open),
+            close: String(parsed?.close ?? DEFAULT_FORMAT_TOKENS.close),
+            plain: String(parsed?.plain ?? DEFAULT_FORMAT_TOKENS.plain)
+          };
         } catch {
-          return { ...DEFAULT_STYLE_TOKENS };
+          return { ...DEFAULT_FORMAT_TOKENS };
         }
-      })()
+      })(),
+      moveBlockId: null
     };
 
     let longPressTimer = null;
@@ -757,94 +754,43 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-    function escapeRegExp(value) {
-      return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    function normalizeFormatTokenValue(value, fallback) {
+      const cleaned = String(value ?? '').replace(/\r\n?/g, '');
+      return cleaned.length ? cleaned : fallback;
     }
 
-    function normalizeTokenInput(value, fallback) {
-      const text = String(value ?? '').replace(/[\r\n]/g, '');
-      return text.length ? text : fallback;
+    function syncFormatTokenInputs() {
+      const tokens = state.formatTokens || DEFAULT_FORMAT_TOKENS;
+      if (formatOpenTokenInput) formatOpenTokenInput.value = tokens.open || DEFAULT_FORMAT_TOKENS.open;
+      if (formatCloseTokenInput) formatCloseTokenInput.value = tokens.close || DEFAULT_FORMAT_TOKENS.close;
+      if (formatPlainTokenInput) formatPlainTokenInput.value = tokens.plain || DEFAULT_FORMAT_TOKENS.plain;
     }
 
-    function getStyleTokens() {
-      const base = state.styleTokens || DEFAULT_STYLE_TOKENS;
-      return {
-        open: normalizeTokenInput(base.open, DEFAULT_STYLE_TOKENS.open),
-        close: normalizeTokenInput(base.close, DEFAULT_STYLE_TOKENS.close),
-        plain: normalizeTokenInput(base.plain, DEFAULT_STYLE_TOKENS.plain)
+    function persistFormatTokens(nextTokens) {
+      state.formatTokens = {
+        open: normalizeFormatTokenValue(nextTokens?.open, DEFAULT_FORMAT_TOKENS.open),
+        close: normalizeFormatTokenValue(nextTokens?.close, DEFAULT_FORMAT_TOKENS.close),
+        plain: normalizeFormatTokenValue(nextTokens?.plain, DEFAULT_FORMAT_TOKENS.plain)
       };
+      localStorage.setItem(FORMAT_TOKENS_KEY, JSON.stringify(state.formatTokens));
+      if (state.mode === 'editor' || state.mode === 'viewer') {
+        renderApp();
+      }
     }
 
-    function saveStyleTokens(tokens) {
-      const normalized = {
-        open: normalizeTokenInput(tokens?.open, DEFAULT_STYLE_TOKENS.open),
-        close: normalizeTokenInput(tokens?.close, DEFAULT_STYLE_TOKENS.close),
-        plain: normalizeTokenInput(tokens?.plain, DEFAULT_STYLE_TOKENS.plain)
-      };
-      state.styleTokens = normalized;
-      localStorage.setItem(STYLE_TOKEN_KEY, JSON.stringify(normalized));
-    }
-
-    function syncStyleTokenInputs() {
-      const tokens = getStyleTokens();
-      if (styleOpenTokenInput) styleOpenTokenInput.value = tokens.open;
-      if (styleCloseTokenInput) styleCloseTokenInput.value = tokens.close;
-      if (stylePlainTokenInput) stylePlainTokenInput.value = tokens.plain;
-    }
-
-    function hasStyleMarkup(source) {
-      const text = String(source ?? '');
-      const tokens = getStyleTokens();
-      return /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})/.test(text)
-        || /S\d{1,3}/.test(text)
-        || (tokens.open && text.includes(tokens.open))
-        || (tokens.close && text.includes(tokens.close))
-        || (tokens.plain && text.includes(tokens.plain));
-    }
-
-    function getStandaloneStyleCommand(input) {
+    function parseFormattedSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const tokens = getStyleTokens();
-      const openToken = escapeRegExp(tokens.open);
-      const colorMatch = text.match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${openToken}$`));
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
-
-      const sizeMatch = text.match(new RegExp(`^S(\d{1,3})${openToken}$`));
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      return null;
-    }
-
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      const tokens = getStyleTokens();
-      const tokenText = esc(tokens.open);
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${tokenText}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${tokenText}</span>`;
-      }
-      return '';
-    }
-
-    function parseStyledSource(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const tokens = getStyleTokens();
-      const openToken = tokens.open;
-      const closeToken = tokens.close;
-      const plainToken = tokens.plain;
+      const tokens = state.formatTokens || DEFAULT_FORMAT_TOKENS;
+      const openToken = normalizeFormatTokenValue(tokens.open, DEFAULT_FORMAT_TOKENS.open);
+      const closeToken = normalizeFormatTokenValue(tokens.close, DEFAULT_FORMAT_TOKENS.close);
+      const plainToken = normalizeFormatTokenValue(tokens.plain, DEFAULT_FORMAT_TOKENS.plain);
 
       let html = '';
-      let buffer = '';
-      let bufferStyle = '';
+      let usedFormatting = false;
       let color = '';
       let size = '';
       let plainMode = false;
+      let buffer = '';
 
       const currentStyle = () => {
         const styles = [];
@@ -853,70 +799,100 @@ dialog::backdrop{
         return styles.join(';');
       };
 
-      const flush = () => {
+      const hasCloseAhead = (fromIndex) => closeToken && text.indexOf(closeToken, fromIndex) !== -1;
+
+      const appendText = (value, style = null) => {
+        if (!value) return;
+        const content = esc(value).replace(/\n/g, '<br>');
+        if (style) html += `<span style="${style}">${content}</span>`;
+        else html += content;
+      };
+
+      const flushBuffer = () => {
         if (!buffer) return;
-        const escaped = esc(buffer).replace(/\n/g, '<br>');
-        if (bufferStyle) html += `<span style="${bufferStyle}">${escaped}</span>`;
-        else html += escaped;
+        appendText(buffer, plainMode ? null : currentStyle() || null);
         buffer = '';
       };
 
-      const emit = (chunk, style = '') => {
-        if (style !== bufferStyle) {
-          flush();
-          bufferStyle = style;
-        }
-        buffer += chunk;
-      };
-
-      const resetStyle = () => {
-        color = '';
-        size = '';
-      };
+      const startsWithToken = (token, pos) => token && text.slice(pos, pos + token.length) === token;
 
       for (let i = 0; i < text.length;) {
-        const remaining = text.slice(i);
+        if (plainMode) {
+          if (startsWithToken(closeToken, i)) {
+            flushBuffer();
+            appendText(closeToken, null);
+            plainMode = false;
+            color = '';
+            size = '';
+            usedFormatting = true;
+            i += closeToken.length;
+            continue;
+          }
 
-        if (!plainMode && openToken && closeToken && plainToken && remaining.startsWith(plainToken) && remaining.indexOf(closeToken, plainToken.length) !== -1) {
-          emit(plainToken, '');
+          buffer += text[i];
+          i += 1;
+          continue;
+        }
+
+        if ((color || size) && startsWithToken(plainToken, i) && hasCloseAhead(i + plainToken.length)) {
+          flushBuffer();
+          appendText(plainToken, null);
           plainMode = true;
+          usedFormatting = true;
           i += plainToken.length;
           continue;
         }
 
-        if (!plainMode) {
-          const colorMatch = remaining.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![0-9a-fA-F])/);
-          if (colorMatch && openToken && remaining.startsWith(colorMatch[0] + openToken)) {
-            color = `#${colorMatch[1]}`;
-            emit(colorMatch[0] + openToken, currentStyle());
-            i += colorMatch[0].length + openToken.length;
-            continue;
-          }
-
-          const sizeMatch = remaining.match(/^S(\d{1,3})/);
-          if (sizeMatch && openToken && remaining.startsWith(sizeMatch[0] + openToken)) {
-            size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-            emit(sizeMatch[0] + openToken, currentStyle());
-            i += sizeMatch[0].length + openToken.length;
-            continue;
-          }
-        }
-
-        if (closeToken && remaining.startsWith(closeToken)) {
-          emit(closeToken, plainMode ? '' : currentStyle());
-          i += closeToken.length;
-          resetStyle();
+        if ((color || size) && startsWithToken(closeToken, i)) {
+          flushBuffer();
+          appendText(closeToken, currentStyle() || null);
           plainMode = false;
+          color = '';
+          size = '';
+          usedFormatting = true;
+          i += closeToken.length;
           continue;
         }
 
-        const ch = text[i];
-        emit(ch, plainMode ? '' : currentStyle());
+        const colorMatch = text.slice(i).match(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/);
+        if (colorMatch) {
+          const commandLength = colorMatch[0].length;
+          if (startsWithToken(openToken, i + commandLength) && hasCloseAhead(i + commandLength + openToken.length)) {
+            flushBuffer();
+            color = `#${colorMatch[1]}`;
+            usedFormatting = true;
+            i += commandLength;
+            appendText(openToken, currentStyle() || null);
+            i += openToken.length;
+            continue;
+          }
+        }
+
+        const sizeMatch = text.slice(i).match(/^S(\d{1,3})/);
+        if (sizeMatch) {
+          const commandLength = sizeMatch[0].length;
+          if (startsWithToken(openToken, i + commandLength) && hasCloseAhead(i + commandLength + openToken.length)) {
+            flushBuffer();
+            size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
+            usedFormatting = true;
+            i += commandLength;
+            appendText(openToken, currentStyle() || null);
+            i += openToken.length;
+            continue;
+          }
+        }
+
+        buffer += text[i];
         i += 1;
       }
 
-      flush();
-      return html;
+      flushBuffer();
+
+      return { html, usedFormatting };
+    }
+
+    function parseStyledSource(input) {
+      return parseFormattedSource(input).html;
     }
 
     function getCookie(name) {
@@ -958,21 +934,6 @@ dialog::backdrop{
       return `${basePageUrl()}#/${siteId}${key ? `/${key}` : ''}`;
     }
 
-    function syncDocumentMeta() {
-      const title = state.current?.title ? String(state.current.title).trim() : '';
-      document.title = title || 'CreateWebsite';
-
-      const description = document.querySelector('meta[name="description"]');
-      if (description) {
-        if (state.current && state.mode !== 'home' && state.mode !== 'boot-failed' && state.mode !== 'loading') {
-          const linkType = state.currentAccess === 'key' ? '共同編集' : '閲覧';
-          description.setAttribute('content', `CreateWebsiteで作成されたサイトの${linkType}リンクです`);
-        } else {
-          description.setAttribute('content', 'メモを書くようにサイトを作って共有できるサービス');
-        }
-      }
-    }
-
     function parseRoute() {
       const hash = decodeURI(location.hash || '');
       if (!hash.startsWith('#/')) return { name: 'home', siteId: null, key: null };
@@ -1000,14 +961,6 @@ dialog::backdrop{
       return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);`;
     }
 
-    function topButtonStyle() {
-      const alpha = Math.max(0, Math.min(1, Number.isFinite(Number(state.addBarOpacity)) ? Number(state.addBarOpacity) : 0.92));
-      if (isDarkMode()) {
-        return `background:rgba(17,24,39,${alpha});color:#fff;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);`;
-      }
-      return `background:rgba(255,255,255,${alpha});color:#111827;border:1px solid rgba(17,24,39,.08);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);`;
-    }
-
     function persistAddBarOpacity(value) {
       const clamped = Math.max(0, Math.min(1, Number.isFinite(Number(value)) ? Number(value) : 0.92));
       state.addBarOpacity = clamped;
@@ -1023,25 +976,14 @@ dialog::backdrop{
       addBarOpacityRange.value = String(percent);
     }
 
-    function refreshBlocksFromSource() {
-      if (state.current) {
-        state.current.blocks = (state.current.blocks || []).map((block) => normalizeBlock(block));
-      }
-      renderApp();
-    }
-
     function normalizeBlock(block = {}) {
-      const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
-      const shouldParseSource = hasStyleMarkup(source);
-      const html = shouldParseSource
-        ? parseStyledSource(source)
-        : (typeof block.html === 'string' && block.html.trim()
-          ? sanitizeRichHtml(block.html)
-          : parseStyledSource(source));
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
 
       return {
         id: block.id || uid8(),
-        source,
+        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
         html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
@@ -1244,7 +1186,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
+            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
             <div class="toolbar" style="justify-content:flex-end">
               ${statusHtml}
               <button class="btn" id="viewerShareBtn" type="button">共有</button>
@@ -1282,12 +1224,12 @@ dialog::backdrop{
         `;
       }).join('');
 
-      const backLabel = 'トップ';
+      const backLabel = state.currentSaved ? '← 戻る' : '← 一覧へ';
 
       appRoot.innerHTML = `
         <div class="editor-top">
           <div>
-            <button class="btn ghost fixed-top-btn" id="backBtn" type="button" style="${topButtonStyle()}">${backLabel}</button>
+            <button class="btn ghost" id="backBtn" type="button">${backLabel}</button>
             <h2 id="editorHeading">${esc(site?.title || '無題のサイト')}</h2>
           </div>
           <div class="toolbar">
@@ -1324,7 +1266,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
+            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
           </div>
           <h2>サイトが見つかりません</h2>
           <div class="canvas" style="margin-top:14px">
@@ -1338,7 +1280,7 @@ dialog::backdrop{
       appRoot.innerHTML = `
         <div class="panel">
           <div class="viewer-top">
-            <button class="btn ghost fixed-top-btn" id="viewerHomeBtn" type="button" style="${topButtonStyle()}">トップ</button>
+            <button class="btn ghost" id="viewerHomeBtn" type="button">← 一覧へ</button>
           </div>
           <h2>アクセスできません</h2>
           <div class="canvas" style="margin-top:14px">
@@ -1349,7 +1291,6 @@ dialog::backdrop{
     }
 
     function renderApp() {
-      syncDocumentMeta();
       if (state.mode === 'loading') drawLoadingScreen();
       else if (state.mode === 'home') drawHomeScreen();
       else if (state.mode === 'viewer') drawViewerScreen();
@@ -1448,18 +1389,16 @@ dialog::backdrop{
 
     function openSiteSettingsModal() {
       if (!state.current || !isCurrentCreator()) return;
-      state.pendingSiteDelete = false;
       sitePublicToggle.checked = state.current.isPublic !== false;
       siteKeyInput.value = state.current.key || '';
       siteDeleteBtn.classList.toggle('hidden', !isCurrentCreator());
       siteClearKeyBtn.classList.toggle('hidden', !isCurrentCreator());
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
-      syncStyleTokenInputs();
+      syncFormatTokenInputs();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1554,27 +1493,12 @@ dialog::backdrop{
 
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      saveStyleTokens(getStyleTokens());
       if (homeSettingsDialog.open) homeSettingsDialog.close();
-      refreshBlocksFromSource();
+      if (state.mode === 'editor') renderApp();
     }
 
     async function saveSiteSettings() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
-
-      if (state.pendingSiteDelete) {
-        await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
-        state.pendingSiteDelete = false;
-        if (siteSettingsDialog.open) siteSettingsDialog.close();
-        state.current = null;
-        state.currentSaved = false;
-        state.currentAccess = 'view';
-        location.hash = '';
-        state.mode = 'home';
-        await loadAllSites();
-        renderApp();
-        return;
-      }
 
       state.current.isPublic = !!sitePublicToggle.checked;
       state.current.key = String(siteKeyInput.value || '').trim();
@@ -1590,8 +1514,6 @@ dialog::backdrop{
 
       await loadAllSites();
       if (siteSettingsDialog.open) siteSettingsDialog.close();
-      state.pendingSiteDelete = false;
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
       renderApp();
       syncCurrentUrl();
     }
@@ -1618,9 +1540,16 @@ dialog::backdrop{
     async function deleteCurrentSite() {
       if (!state.current || !state.db || !isCurrentCreator()) return;
 
-      state.pendingSiteDelete = true;
-      if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = 'サイトの削除を確定';
+      const ok = confirm('このサイトを削除しますか？');
+      if (!ok) return;
+
+      await deleteDoc(doc(state.db, COLLECTION, state.current.siteId));
+      state.current = null;
+      state.currentSaved = false;
+      state.currentAccess = 'view';
+      location.hash = '';
       state.mode = 'home';
+      await loadAllSites();
       renderApp();
     }
 
@@ -1854,20 +1783,20 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
-      const html = parseStyledSource(raw) || '<br>';
+      const parsed = parseFormattedSource(raw);
 
-      if (standaloneCommand) {
-        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
+      if (parsed.usedFormatting) {
+        element.innerHTML = parsed.html || '<br>';
         element.blur?.();
         const selection = window.getSelection?.();
         if (selection) selection.removeAllRanges();
-        state.current.blocks[idx].html = renderStandaloneStyleCommand(standaloneCommand) || html;
-      } else {
-        state.current.blocks[idx].html = html;
       }
 
-      state.current.blocks[idx].source = raw;
+      const visibleText = element.innerText.replace(/\r/g, '');
+      const html = parsed.usedFormatting ? (parsed.html || '<br>') : (sanitizeRichHtml(element.innerHTML) || '<br>');
+
+      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
 
@@ -1995,8 +1924,6 @@ dialog::backdrop{
       }
 
       if (target.closest('#siteSettingsCancelBtn')) {
-        state.pendingSiteDelete = false;
-        if (siteSettingsSaveBtn) siteSettingsSaveBtn.textContent = '保存して閉じる';
         if (siteSettingsDialog.open) siteSettingsDialog.close();
         return;
       }
@@ -2028,7 +1955,7 @@ dialog::backdrop{
       }
 
       if (target.closest('#homeSettingsCloseBtn')) {
-        saveHomeSettings();
+        if (homeSettingsDialog.open) homeSettingsDialog.close();
         return;
       }
 
@@ -2125,14 +2052,27 @@ dialog::backdrop{
         return;
       }
 
-      if (target.id === 'styleOpenTokenInput' || target.id === 'styleCloseTokenInput' || target.id === 'stylePlainTokenInput') {
-        const nextTokens = {
-          open: normalizeTokenInput(styleOpenTokenInput?.value, DEFAULT_STYLE_TOKENS.open),
-          close: normalizeTokenInput(styleCloseTokenInput?.value, DEFAULT_STYLE_TOKENS.close),
-          plain: normalizeTokenInput(stylePlainTokenInput?.value, DEFAULT_STYLE_TOKENS.plain)
-        };
-        saveStyleTokens(nextTokens);
-        refreshBlocksFromSource();
+      if (target.id === 'formatOpenTokenInput') {
+        persistFormatTokens({
+          ...(state.formatTokens || DEFAULT_FORMAT_TOKENS),
+          open: normalizeFormatTokenValue(target.value, DEFAULT_FORMAT_TOKENS.open)
+        });
+        return;
+      }
+
+      if (target.id === 'formatCloseTokenInput') {
+        persistFormatTokens({
+          ...(state.formatTokens || DEFAULT_FORMAT_TOKENS),
+          close: normalizeFormatTokenValue(target.value, DEFAULT_FORMAT_TOKENS.close)
+        });
+        return;
+      }
+
+      if (target.id === 'formatPlainTokenInput') {
+        persistFormatTokens({
+          ...(state.formatTokens || DEFAULT_FORMAT_TOKENS),
+          plain: normalizeFormatTokenValue(target.value, DEFAULT_FORMAT_TOKENS.plain)
+        });
         return;
       }
 
@@ -2140,7 +2080,6 @@ dialog::backdrop{
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
         if (heading) heading.textContent = target.value || '無題のサイト';
-        syncDocumentMeta();
         state.currentSaved = false;
         return;
       }
