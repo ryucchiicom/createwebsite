@@ -827,7 +827,7 @@ function readFormatCommandAt(text, index, tokens) {
       };
     }
 
-    const sizeMatch = text.slice(index).match(new RegExp(`^S(\\d{1,3})${startToken}`));
+    const sizeMatch = text.slice(index).match(new RegExp(`^S(\d{1,3})${startToken}`));
     if (sizeMatch) {
       return {
         type: 'size',
@@ -850,7 +850,7 @@ function getStandaloneStyleCommand(input) {
     return { type: 'color', value: `#${colorMatch[1]}` };
   }
 
-  const sizeMatch = text.match(new RegExp(`^S(\\d{1,3})${startToken}$`));
+  const sizeMatch = text.match(new RegExp(`^S(\d{1,3})${startToken}$`));
   if (sizeMatch) {
     return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
   }
@@ -870,6 +870,7 @@ function renderStandaloneStyleCommand(command) {
   }
   return '';
 }
+
 
 function parseStyledSource(input) {
   const text = String(input ?? '').replace(/\r\n?/g, '\n');
@@ -959,7 +960,8 @@ function parseStyledSource(input) {
   return html || '<br>';
 }
 
-    function getCookie(name) {
+
+function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1451,6 +1453,7 @@ function parseStyledSource(input) {
       });
     }
 
+
     function placeCaretAtEnd(el) {
       if (!el) return;
       const selection = window.getSelection();
@@ -1460,6 +1463,43 @@ function parseStyledSource(input) {
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
+    }
+
+    function getCaretTextOffset(root) {
+      const selection = window.getSelection?.();
+      if (!selection || !selection.rangeCount) return null;
+      const range = selection.getRangeAt(0);
+      if (!root.contains(range.startContainer)) return null;
+
+      const preRange = range.cloneRange();
+      preRange.selectNodeContents(root);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      return preRange.toString().length;
+    }
+
+    function setCaretTextOffset(root, offset) {
+      const selection = window.getSelection?.();
+      if (!selection) return;
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      let current = 0;
+      let node = walker.nextNode();
+      const range = document.createRange();
+
+      while (node) {
+        const next = current + (node.textContent?.length || 0);
+        if (offset <= next) {
+          range.setStart(node, Math.max(0, offset - current));
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          return;
+        }
+        current = next;
+        node = walker.nextNode();
+      }
+
+      placeCaretAtEnd(root);
     }
 
     function openBlockSettingsModal(blockId = null) {
@@ -1876,86 +1916,27 @@ function parseStyledSource(input) {
       focusBlockEditor(block.id);
     }
 
-    function getCaretOffsetWithin(root) {
-      const selection = window.getSelection?.();
-      if (!selection || !selection.rangeCount) return null;
-      const range = selection.getRangeAt(0);
-      if (!root.contains(range.startContainer)) return null;
-
-      const preRange = range.cloneRange();
-      preRange.selectNodeContents(root);
-      preRange.setEnd(range.startContainer, range.startOffset);
-      return preRange.toString().length;
-    }
-
-    function setCaretOffsetWithin(root, offset) {
-      if (!root || typeof offset !== 'number' || offset < 0) return;
-
-      const selection = window.getSelection?.();
-      if (!selection) return;
-
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, null);
-      let currentOffset = 0;
-      let node = walker.currentNode;
-
-      while (node) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const nextOffset = currentOffset + node.nodeValue.length;
-          if (offset <= nextOffset) {
-            const range = document.createRange();
-            range.setStart(node, Math.max(0, offset - currentOffset));
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            return;
-          }
-          currentOffset = nextOffset;
-        } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
-          const nextOffset = currentOffset + 1;
-          if (offset <= nextOffset) {
-            const range = document.createRange();
-            range.setStartAfter(node);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            return;
-          }
-          currentOffset = nextOffset;
-        }
-
-        node = walker.nextNode();
-      }
-
-      const range = document.createRange();
-      range.selectNodeContents(root);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-
-    function updateEditableBlockFromDom(blockId, element) {
+    
+function updateEditableBlockFromDom(blockId, element) {
       if (!state.current || !blockId || !element) return;
       const idx = state.current.blocks.findIndex((b) => b.id === blockId);
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
+      const caretOffset = getCaretTextOffset(element);
       const standaloneCommand = getStandaloneStyleCommand(raw);
       let html = parseStyledSource(raw) || '<br>';
 
       if (standaloneCommand && raw === raw.trim()) {
         html = renderStandaloneStyleCommand(standaloneCommand);
+      }
+
+      if (element.innerHTML !== html) {
         element.innerHTML = html;
-        element.blur?.();
-        const selection = window.getSelection?.();
-        if (selection) selection.removeAllRanges();
-      } else {
-        const beforeOffset = getCaretOffsetWithin(element);
-        const currentHtml = sanitizeRichHtml(element.innerHTML) || '';
-        if (currentHtml !== html) {
-          element.innerHTML = html;
-          if (beforeOffset !== null) {
-            setCaretOffsetWithin(element, beforeOffset);
-          }
+        if (Number.isFinite(caretOffset)) {
+          setCaretTextOffset(element, caretOffset);
+        } else {
+          placeCaretAtEnd(element);
         }
       }
 
