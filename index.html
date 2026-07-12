@@ -467,7 +467,7 @@ dialog::backdrop{
   <dialog id="homeSettingsDialog">
     <div class="dialog-body">
       <h2>画面設定</h2>
-      <p>下の「＋ 追加」バーの透過度を変えられます。さらに、形式で使う文字もここで変えられます。</p>
+      <p>下の「＋ 追加」バーの透過度と、形式トリガーを変えられます。複数文字も使えます。</p>
 
       <div class="field">
         <label for="addBarOpacityRange">＋追加の透過度：<span id="addBarOpacityValue">92%</span></label>
@@ -475,21 +475,19 @@ dialog::backdrop{
       </div>
 
       <div class="field">
-        <label for="formatStartTokenInput">形式開始文字（色・サイズのあとに付く文字）</label>
-        <input id="formatStartTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+        <label for="styleOpenTokenInput">開始トリガー（複数文字可・改行不可）</label>
+        <input id="styleOpenTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" />
       </div>
 
       <div class="field">
-        <label for="formatEndTokenInput">形式終了文字</label>
-        <input id="formatEndTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+        <label for="styleCloseTokenInput">終了トリガー（複数文字可・改行不可）</label>
+        <input id="styleCloseTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" />
       </div>
 
       <div class="field">
-        <label for="formatResetTokenInput">形式解除文字</label>
-        <input id="formatResetTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+        <label for="styleResetTokenInput">解除トリガー（複数文字可・改行不可）</label>
+        <input id="styleResetTokenInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" />
       </div>
-
-      <p class="notice">複数文字でも使えます。改行は入れられません。</p>
 
       <div class="toolbar">
         <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
@@ -649,17 +647,20 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const FORMAT_START_TOKEN_KEY = 'createwebsite:formatStartToken:v1';
-    const FORMAT_END_TOKEN_KEY = 'createwebsite:formatEndToken:v1';
-    const FORMAT_RESET_TOKEN_KEY = 'createwebsite:formatResetToken:v1';
+    const STYLE_TOKEN_STORAGE_KEY = 'createwebsite:styleTokens:v1';
+    const DEFAULT_STYLE_TOKENS = Object.freeze({
+      open: "'",
+      close: '"',
+      reset: '€'
+    });
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
-    const formatStartTokenInput = document.getElementById('formatStartTokenInput');
-    const formatEndTokenInput = document.getElementById('formatEndTokenInput');
-    const formatResetTokenInput = document.getElementById('formatResetTokenInput');
+    const styleOpenTokenInput = document.getElementById('styleOpenTokenInput');
+    const styleCloseTokenInput = document.getElementById('styleCloseTokenInput');
+    const styleResetTokenInput = document.getElementById('styleResetTokenInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -698,9 +699,7 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      formatStartToken: (() => String(localStorage.getItem(FORMAT_START_TOKEN_KEY) ?? "'").replace(/\r\n?/g, '') || "'")(),
-      formatEndToken: (() => String(localStorage.getItem(FORMAT_END_TOKEN_KEY) ?? '"').replace(/\r\n?/g, '') || '"')(),
-      formatResetToken: (() => String(localStorage.getItem(FORMAT_RESET_TOKEN_KEY) ?? '€').replace(/\r\n?/g, '') || '€')(),
+      styleTokens: loadStyleTokenSettings(),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -752,193 +751,156 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-    function normalizeTokenValue(value, fallback) {
-      const normalized = String(value ?? '').replace(/\r\n?/g, '');
-      return normalized.length ? normalized : fallback;
+    function normalizeStyleToken(value, fallback) {
+      const cleaned = String(value ?? '').replace(/\r?\n/g, '');
+      return cleaned.length ? cleaned : fallback;
     }
 
-    function escapeRegExp(value) {
-      return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    function loadStyleTokenSettings() {
+      try {
+        const raw = localStorage.getItem(STYLE_TOKEN_STORAGE_KEY);
+        if (!raw) {
+          return { ...DEFAULT_STYLE_TOKENS };
+        }
+        const parsed = JSON.parse(raw);
+        return {
+          open: normalizeStyleToken(parsed?.open, DEFAULT_STYLE_TOKENS.open),
+          close: normalizeStyleToken(parsed?.close, DEFAULT_STYLE_TOKENS.close),
+          reset: normalizeStyleToken(parsed?.reset, DEFAULT_STYLE_TOKENS.reset)
+        };
+      } catch {
+        return { ...DEFAULT_STYLE_TOKENS };
+      }
     }
 
-    function currentFormatTokens() {
-      return {
-        start: normalizeTokenValue(state.formatStartToken, "'"),
-        end: normalizeTokenValue(state.formatEndToken, '"'),
-        reset: normalizeTokenValue(state.formatResetToken, '€')
-      };
-    }
-
-    function syncFormatTokenInputs() {
-      const tokens = currentFormatTokens();
-      if (formatStartTokenInput) formatStartTokenInput.value = tokens.start;
-      if (formatEndTokenInput) formatEndTokenInput.value = tokens.end;
-      if (formatResetTokenInput) formatResetTokenInput.value = tokens.reset;
-    }
-
-    function persistFormatTokensFromInputs() {
+    function saveStyleTokenSettings(tokens) {
       const next = {
-        start: normalizeTokenValue(formatStartTokenInput?.value, "'"),
-        end: normalizeTokenValue(formatEndTokenInput?.value, '"'),
-        reset: normalizeTokenValue(formatResetTokenInput?.value, '€')
+        open: normalizeStyleToken(tokens?.open, DEFAULT_STYLE_TOKENS.open),
+        close: normalizeStyleToken(tokens?.close, DEFAULT_STYLE_TOKENS.close),
+        reset: normalizeStyleToken(tokens?.reset, DEFAULT_STYLE_TOKENS.reset)
       };
-
-      state.formatStartToken = next.start;
-      state.formatEndToken = next.end;
-      state.formatResetToken = next.reset;
-
-      localStorage.setItem(FORMAT_START_TOKEN_KEY, next.start);
-      localStorage.setItem(FORMAT_END_TOKEN_KEY, next.end);
-      localStorage.setItem(FORMAT_RESET_TOKEN_KEY, next.reset);
+      localStorage.setItem(STYLE_TOKEN_STORAGE_KEY, JSON.stringify(next));
+      return next;
     }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const tokens = currentFormatTokens();
-      const startToken = escapeRegExp(tokens.start);
-      const colorMatch = text.match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${startToken}$`));
+    function parseStyleCommand(segment) {
+      const text = String(segment ?? '').replace(/\r\n?/g, '\n');
+      const colorMatch = text.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
       if (colorMatch) {
         return { type: 'color', value: `#${colorMatch[1]}` };
       }
 
-      const sizeMatch = text.match(new RegExp(`^S(\d{1,3})${startToken}$`));
+      const sizeMatch = text.match(/^S(\d{1,3})$/);
       if (sizeMatch) {
         return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
-
-      if (text === tokens.reset) {
-        return { type: 'reset', value: tokens.reset };
       }
 
       return null;
     }
 
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      const tokens = currentFormatTokens();
-      if (command.type === 'reset') {
-        return esc(tokens.reset);
+    function escapeWithBreaks(value) {
+      return esc(value).replace(/\n/g, '<br>');
+    }
+
+    function composeStyle(stack) {
+      const style = {};
+      for (const item of stack) {
+        if (item.type === 'color') {
+          style.color = item.value;
+        } else if (item.type === 'size') {
+          style.fontSize = `${item.value}px`;
+        }
       }
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${esc(tokens.start)}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${esc(tokens.start)}</span>`;
-      }
-      return '';
+      return style;
+    }
+
+    function renderStyledRun(text, stack = []) {
+      const value = String(text ?? '');
+      if (!value) return '';
+      const content = escapeWithBreaks(value);
+      const style = composeStyle(stack);
+      const rules = [];
+      if (style.color) rules.push(`color:${style.color}`);
+      if (style.fontSize) rules.push(`font-size:${style.fontSize}`);
+      if (!rules.length) return content;
+      return `<span style="${rules.join(';')}">${content}</span>`;
+    }
+
+    function getStyleTokens() {
+      const tokens = state.styleTokens || DEFAULT_STYLE_TOKENS;
+      return {
+        open: normalizeStyleToken(tokens.open, DEFAULT_STYLE_TOKENS.open),
+        close: normalizeStyleToken(tokens.close, DEFAULT_STYLE_TOKENS.close),
+        reset: normalizeStyleToken(tokens.reset, DEFAULT_STYLE_TOKENS.reset)
+      };
+    }
+
+    function shouldParseStyledSource(input) {
+      const text = String(input ?? '').replace(/\r\n?/g, '\n');
+      const tokens = getStyleTokens();
+      return Boolean(
+        (tokens.open && text.includes(tokens.open)) ||
+        (tokens.close && text.includes(tokens.close)) ||
+        (tokens.reset && text.includes(tokens.reset))
+      );
     }
 
     function parseStyledSource(input) {
       const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const tokens = currentFormatTokens();
-
+      const tokens = getStyleTokens();
       let html = '';
-      let color = '';
-      let size = '';
-      let spanOpen = false;
-      let plainUntilEndToken = false;
+      let stack = [];
+      let segment = '';
 
-      const currentStyle = () => {
-        const styles = [];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${size}px`);
-        return styles.join(';');
-      };
-
-      const closeSpan = () => {
-        if (spanOpen) {
-          html += '</span>';
-          spanOpen = false;
-        }
-      };
-
-      const openSpan = () => {
-        const style = currentStyle();
-        if (!style) return;
-        html += `<span style="${style}">`;
-        spanOpen = true;
-      };
-
-      const resetStyles = () => {
-        color = '';
-        size = '';
-      };
-
-      const appendPlain = (value) => {
-        if (value === '\n') {
-          html += '<br>';
-        } else {
-          html += esc(value);
-        }
+      const flushSegment = () => {
+        if (!segment) return;
+        html += renderStyledRun(segment, stack);
+        segment = '';
       };
 
       for (let i = 0; i < text.length;) {
-        if (plainUntilEndToken) {
-          if (tokens.end && text.startsWith(tokens.end, i)) {
-            appendPlain(tokens.end);
-            plainUntilEndToken = false;
-            i += tokens.end.length;
-            continue;
+        if (tokens.open && text.startsWith(tokens.open, i)) {
+          const command = parseStyleCommand(segment);
+          if (command) {
+            stack = stack.concat(command);
+            segment = '';
+            html += renderStyledRun(tokens.open, stack);
+          } else {
+            flushSegment();
+            html += renderStyledRun(tokens.open, stack);
           }
+          i += tokens.open.length;
+          continue;
+        }
 
-          appendPlain(text[i]);
-          i += 1;
+        if (tokens.close && text.startsWith(tokens.close, i)) {
+          flushSegment();
+          html += renderStyledRun(tokens.close, stack);
+          if (stack.length) {
+            stack = stack.slice(0, -1);
+          }
+          i += tokens.close.length;
           continue;
         }
 
         if (tokens.reset && text.startsWith(tokens.reset, i)) {
-          closeSpan();
-          appendPlain(tokens.reset);
-          resetStyles();
-          plainUntilEndToken = true;
+          flushSegment();
+          html += escapeWithBreaks(tokens.reset);
+          stack = [];
           i += tokens.reset.length;
           continue;
         }
 
-        if (tokens.end && text.startsWith(tokens.end, i)) {
-          if (color || size) {
-            if (!spanOpen) openSpan();
-            appendPlain(tokens.end);
-            closeSpan();
-            resetStyles();
-          } else {
-            appendPlain(tokens.end);
-          }
-          i += tokens.end.length;
-          continue;
-        }
-
-        const tail = text.slice(i);
-
-        const colorMatch = tail.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![0-9a-fA-F])/);
-        if (colorMatch) {
-          color = `#${colorMatch[1]}`;
-          if (spanOpen) closeSpan();
-          if (color || size) openSpan();
-          i += colorMatch[0].length;
-          continue;
-        }
-
-        const sizeMatch = tail.match(/^S(\d{1,3})(?!\d)/);
-        if (sizeMatch) {
-          size = String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16)));
-          if (spanOpen) closeSpan();
-          if (color || size) openSpan();
-          i += sizeMatch[0].length;
-          continue;
-        }
-
-        if (!spanOpen && (color || size)) openSpan();
-
-        appendPlain(text[i]);
+        segment += text[i];
         i += 1;
       }
 
-      closeSpan();
+      flushSegment();
       return html;
     }
 
     function getCookie(name) {
+
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1465,9 +1427,15 @@ dialog::backdrop{
       if (!siteSettingsDialog.open) siteSettingsDialog.showModal();
     }
 
-    function openHomeSettingsModal() {
+    function syncHomeSettingsFields() {
       updateAddBarOpacityLabel();
-      syncFormatTokenInputs();
+      styleOpenTokenInput.value = state.styleTokens.open;
+      styleCloseTokenInput.value = state.styleTokens.close;
+      styleResetTokenInput.value = state.styleTokens.reset;
+    }
+
+    function openHomeSettingsModal() {
+      syncHomeSettingsFields();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1561,8 +1529,15 @@ dialog::backdrop{
     }
 
     async function saveHomeSettings() {
+      const nextTokens = {
+        open: normalizeStyleToken(styleOpenTokenInput.value, DEFAULT_STYLE_TOKENS.open),
+        close: normalizeStyleToken(styleCloseTokenInput.value, DEFAULT_STYLE_TOKENS.close),
+        reset: normalizeStyleToken(styleResetTokenInput.value, DEFAULT_STYLE_TOKENS.reset)
+      };
+
+      state.styleTokens = saveStyleTokenSettings(nextTokens);
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      persistFormatTokensFromInputs();
+
       if (homeSettingsDialog.open) homeSettingsDialog.close();
       renderApp();
     }
@@ -1862,19 +1837,17 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const standaloneCommand = getStandaloneStyleCommand(raw);
+      const shouldParse = shouldParseStyledSource(raw);
+      const html = shouldParse ? (parseStyledSource(raw) || '<br>') : (sanitizeRichHtml(element.innerHTML) || '<br>');
 
-      if (standaloneCommand) {
-        element.innerHTML = renderStandaloneStyleCommand(standaloneCommand);
-        element.blur?.();
-        const selection = window.getSelection?.();
-        if (selection) selection.removeAllRanges();
+      if (shouldParse && element.innerHTML !== html) {
+        element.innerHTML = html;
+        if (document.activeElement === element) {
+          placeCaretAtEnd(element);
+        }
       }
 
-      const visibleText = element.innerText.replace(/\r/g, '');
-      const html = sanitizeRichHtml(element.innerHTML) || '<br>';
-
-      state.current.blocks[idx].source = visibleText;
+      state.current.blocks[idx].source = raw;
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
@@ -2133,8 +2106,21 @@ dialog::backdrop{
         return;
       }
 
-      if (target.id === 'formatStartTokenInput' || target.id === 'formatEndTokenInput' || target.id === 'formatResetTokenInput') {
-        persistFormatTokensFromInputs();
+      if (target.id === 'styleOpenTokenInput') {
+        target.value = normalizeStyleToken(target.value, state.styleTokens.open);
+        state.styleTokens.open = target.value;
+        return;
+      }
+
+      if (target.id === 'styleCloseTokenInput') {
+        target.value = normalizeStyleToken(target.value, state.styleTokens.close);
+        state.styleTokens.close = target.value;
+        return;
+      }
+
+      if (target.id === 'styleResetTokenInput') {
+        target.value = normalizeStyleToken(target.value, state.styleTokens.reset);
+        state.styleTokens.reset = target.value;
         return;
       }
 
