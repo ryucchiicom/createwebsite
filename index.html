@@ -913,10 +913,10 @@ function parseStyledSource(input) {
     const command = readFormatCommandAt(text, i, tokens);
     if (command) {
       if (command.type === 'plain') {
-        closeSpan();
+        if (spanOpen) closeSpan();
+        html += esc(text.slice(i, i + command.length));
         color = '';
         size = '';
-        html += esc(text.slice(i, i + command.length));
         i += command.length;
         continue;
       }
@@ -1876,6 +1876,67 @@ function parseStyledSource(input) {
       focusBlockEditor(block.id);
     }
 
+    function getCaretTextOffset(root) {
+      const selection = window.getSelection?.();
+      if (!selection || selection.rangeCount === 0) return null;
+
+      const range = selection.getRangeAt(0);
+      if (!root.contains(range.startContainer)) return null;
+
+      const probe = range.cloneRange();
+      probe.selectNodeContents(root);
+      probe.setEnd(range.startContainer, range.startOffset);
+      return probe.toString().length;
+    }
+
+    function setCaretTextOffset(root, offset) {
+      const selection = window.getSelection?.();
+      if (!selection) return;
+
+      const targetOffset = Math.max(0, Number(offset) || 0);
+      const range = document.createRange();
+      let remaining = targetOffset;
+
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+      );
+
+      let placed = false;
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        let length = 0;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          length = node.nodeValue.length;
+          if (remaining <= length) {
+            range.setStart(node, remaining);
+            range.collapse(true);
+            placed = true;
+            break;
+          }
+        } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+          length = 1;
+          if (remaining <= length) {
+            range.setStartAfter(node);
+            range.collapse(true);
+            placed = true;
+            break;
+          }
+        }
+
+        remaining -= length;
+      }
+
+      if (!placed) {
+        range.selectNodeContents(root);
+        range.collapse(false);
+      }
+
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
     function updateEditableBlockFromDom(blockId, element) {
       if (!state.current || !blockId || !element) return;
       const idx = state.current.blocks.findIndex((b) => b.id === blockId);
@@ -1883,24 +1944,22 @@ function parseStyledSource(input) {
 
       const raw = element.innerText.replace(/\r/g, '');
       const standaloneCommand = getStandaloneStyleCommand(raw);
+      const caretOffset = getCaretTextOffset(element);
       let html = parseStyledSource(raw) || '<br>';
-      const previousHtml = element.innerHTML;
 
       if (standaloneCommand && raw === raw.trim()) {
         html = renderStandaloneStyleCommand(standaloneCommand);
-      }
-
-      if (html !== previousHtml) {
         element.innerHTML = html;
-        if (!(standaloneCommand && raw === raw.trim())) {
-          requestAnimationFrame(() => placeCaretAtEnd(element));
-        }
-      }
-
-      if (standaloneCommand && raw === raw.trim()) {
         element.blur?.();
         const selection = window.getSelection?.();
         if (selection) selection.removeAllRanges();
+      } else if (element.innerHTML !== html) {
+        element.innerHTML = html;
+        if (caretOffset !== null) {
+          requestAnimationFrame(() => {
+            setCaretTextOffset(element, Math.min(caretOffset, raw.length));
+          });
+        }
       }
 
       state.current.blocks[idx].source = raw;
