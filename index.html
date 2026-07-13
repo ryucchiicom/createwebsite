@@ -752,9 +752,8 @@ function stripNewlines(value) {
   return String(value ?? '').replace(/[\r\n]+/g, '');
 }
 
-function normalizeTokenValue(value, fallback) {
-  const cleaned = stripNewlines(value);
-  return cleaned.length ? cleaned.slice(0, 32) : fallback;
+function normalizeTokenValue(value) {
+  return stripNewlines(value).slice(0, 32);
 }
 
 function escapeRegExp(value) {
@@ -768,9 +767,9 @@ function loadFormatTokens() {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
-      start: normalizeTokenValue(parsed?.start, fallback.start),
-      end: normalizeTokenValue(parsed?.end, fallback.end),
-      plain: normalizeTokenValue(parsed?.plain, fallback.plain)
+      start: normalizeTokenValue(parsed?.start),
+      end: normalizeTokenValue(parsed?.end),
+      plain: normalizeTokenValue(parsed?.plain)
     };
   } catch {
     return fallback;
@@ -779,24 +778,23 @@ function loadFormatTokens() {
 
 function currentFormatTokens() {
   return {
-    start: normalizeTokenValue(state.formatTokens?.start, DEFAULT_FORMAT_TOKENS.start),
-    end: normalizeTokenValue(state.formatTokens?.end, DEFAULT_FORMAT_TOKENS.end),
-    plain: normalizeTokenValue(state.formatTokens?.plain, DEFAULT_FORMAT_TOKENS.plain)
+    start: state.formatTokens?.start ? normalizeTokenValue(state.formatTokens.start) : DEFAULT_FORMAT_TOKENS.start,
+    end: state.formatTokens?.end ? normalizeTokenValue(state.formatTokens.end) : DEFAULT_FORMAT_TOKENS.end,
+    plain: state.formatTokens?.plain ? normalizeTokenValue(state.formatTokens.plain) : DEFAULT_FORMAT_TOKENS.plain
   };
 }
 
 function syncFormatTokenInputs() {
-  const tokens = currentFormatTokens();
-  if (formatStartTokenInput) formatStartTokenInput.value = tokens.start;
-  if (formatEndTokenInput) formatEndTokenInput.value = tokens.end;
-  if (formatPlainTokenInput) formatPlainTokenInput.value = tokens.plain;
+  if (formatStartTokenInput) formatStartTokenInput.value = normalizeTokenValue(state.formatTokens?.start);
+  if (formatEndTokenInput) formatEndTokenInput.value = normalizeTokenValue(state.formatTokens?.end);
+  if (formatPlainTokenInput) formatPlainTokenInput.value = normalizeTokenValue(state.formatTokens?.plain);
 }
 
 function persistFormatTokenSettingsFromInputs() {
   const next = {
-    start: normalizeTokenValue(formatStartTokenInput?.value, DEFAULT_FORMAT_TOKENS.start),
-    end: normalizeTokenValue(formatEndTokenInput?.value, DEFAULT_FORMAT_TOKENS.end),
-    plain: normalizeTokenValue(formatPlainTokenInput?.value, DEFAULT_FORMAT_TOKENS.plain)
+    start: normalizeTokenValue(formatStartTokenInput?.value),
+    end: normalizeTokenValue(formatEndTokenInput?.value),
+    plain: normalizeTokenValue(formatPlainTokenInput?.value)
   };
 
   state.formatTokens = next;
@@ -1911,37 +1909,19 @@ function getCookie(name) {
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const trimmedRaw = raw.trim();
-      const standaloneCommand = getStandaloneStyleCommand(trimmedRaw);
       const hasFormatCommand = containsRenderableFormatCommand(raw);
-      const parsedHtml = parseStyledSource(raw) || '<br>';
-      const isPendingStyleOnly = Boolean(
-        standaloneCommand &&
-        (standaloneCommand.type === 'color' || standaloneCommand.type === 'size') &&
-        parsedHtml === '<br>'
-      );
-      let html = parsedHtml;
+      const html = parseStyledSource(raw) || '<br>';
 
-      if (standaloneCommand && trimmedRaw && !isPendingStyleOnly) {
-        html = renderStandaloneStyleCommand(standaloneCommand);
+      if (hasFormatCommand && element.innerHTML !== html) {
+        element.innerHTML = html;
       }
 
-      if (isPendingStyleOnly) {
-        html = element.innerHTML;
-      }
-
-      if (standaloneCommand || hasFormatCommand) {
-        if (!isPendingStyleOnly && element.innerHTML !== html) {
-          element.innerHTML = html;
-        }
-
-        if (document.activeElement === element) {
-          requestAnimationFrame(() => {
-            element.blur?.();
-            const selection = window.getSelection?.();
-            if (selection) selection.removeAllRanges();
-          });
-        }
+      if (hasFormatCommand && document.activeElement === element) {
+        requestAnimationFrame(() => {
+          element.blur?.();
+          const selection = window.getSelection?.();
+          if (selection) selection.removeAllRanges();
+        });
       }
 
       state.current.blocks[idx].source = raw;
@@ -1949,7 +1929,7 @@ function getCookie(name) {
       state.currentSaved = false;
     }
 
-    function handleClick(target) {
+function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
         const siteId = openSiteBtn.getAttribute('data-open-site');
