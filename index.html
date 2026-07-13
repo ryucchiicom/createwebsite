@@ -465,38 +465,35 @@ dialog::backdrop{
   <main class="app-shell" id="app"></main>
 
   <dialog id="homeSettingsDialog">
-    <div class="dialog-body">
-      <h2>画面設定</h2>
-      <p>UIの不透明度や、`'`・`"`・`€` の記号を自由に変えられます。</p>
+  <div class="dialog-body">
+    <h2>画面設定</h2>
+    <p>下の「＋ 追加」バーの透過度と、形式に使う文字を変えられます。複数文字可・改行不可です。</p>
 
+    <div class="field">
+      <label for="addBarOpacityRange">UIの不透明度：<span id="addBarOpacityValue">92%</span></label>
+      <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
+    </div>
 
-  <div class="field">
-    <label for="addBarOpacityRange">UIの不透明度：<span id="addBarOpacityValue">92%</span></label>
-    <input id="addBarOpacityRange" type="range" min="0" max="100" step="1" />
+    <div class="field">
+      <label for="formatStartTokenInput">形式開始文字</label>
+      <input id="formatStartTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+    </div>
+
+    <div class="field">
+      <label for="formatEndTokenInput">形式終了文字</label>
+      <input id="formatEndTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+    </div>
+
+    <div class="field">
+      <label for="formatPlainTokenInput">形式なし文字</label>
+      <input id="formatPlainTokenInput" type="text" spellcheck="false" autocomplete="off" inputmode="text" />
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
+    </div>
   </div>
-
-  <div class="field">
-    <label for="formatOpenTokenInput">開始記号</label>
-    <input id="formatOpenTokenInput" type="text" inputmode="text" autocomplete="off" placeholder="例：'" />
-  </div>
-
-  <div class="field">
-    <label for="formatCloseTokenInput">終了記号</label>
-    <input id="formatCloseTokenInput" type="text" inputmode="text" autocomplete="off" placeholder="例：&quot;" />
-  </div>
-
-  <div class="field">
-    <label for="formatResetTokenInput">解除記号</label>
-    <input id="formatResetTokenInput" type="text" inputmode="text" autocomplete="off" placeholder="例：€" />
-  </div>
-
-  <div class="toolbar">
-    <button class="btn" id="homeSettingsCloseBtn" type="button">閉じる</button>
-  </div>
-</div>
-
-
-  </dialog>
+</dialog>
 
   <dialog id="siteSettingsDialog">
     <div class="dialog-body">
@@ -650,13 +647,16 @@ dialog::backdrop{
     const COLLECTION = 'websites';
     const OWNER_COOKIE = 'createwebsiteCreatorId';
     const ADD_BAR_OPACITY_KEY = 'createwebsite:addBarOpacity:v1';
-    const FORMAT_TOKENS_KEY = 'createwebsite:formatTokens:v1';
-    const DEFAULT_FORMAT_TOKENS = { open: "'", close: '"', reset: '€' };
+    const FORMAT_TOKEN_SETTINGS_KEY = 'createwebsite:formatTokens:v1';
+    const DEFAULT_FORMAT_TOKENS = { start: "'", end: '"', plain: '€' };
 
     const appRoot = document.getElementById('app');
     const homeSettingsDialog = document.getElementById('homeSettingsDialog');
     const addBarOpacityRange = document.getElementById('addBarOpacityRange');
     const addBarOpacityValue = document.getElementById('addBarOpacityValue');
+    const formatStartTokenInput = document.getElementById('formatStartTokenInput');
+    const formatEndTokenInput = document.getElementById('formatEndTokenInput');
+    const formatPlainTokenInput = document.getElementById('formatPlainTokenInput');
     const siteSettingsDialog = document.getElementById('siteSettingsDialog');
     const sitePublicToggle = document.getElementById('sitePublicToggle');
     const siteKeyInput = document.getElementById('siteKeyInput');
@@ -695,20 +695,7 @@ dialog::backdrop{
       authError: '',
       pendingBlockSettingsId: null,
       addBarOpacity: (() => { const v = Number(localStorage.getItem(ADD_BAR_OPACITY_KEY)); return Number.isFinite(v) ? v : 0.92; })(),
-      formatTokens: (() => {
-        try {
-          const raw = localStorage.getItem(FORMAT_TOKENS_KEY);
-          if (!raw) return { ...DEFAULT_FORMAT_TOKENS };
-          const parsed = JSON.parse(raw);
-          return {
-            open: normalizeInlineToken(parsed?.open, DEFAULT_FORMAT_TOKENS.open),
-            close: normalizeInlineToken(parsed?.close, DEFAULT_FORMAT_TOKENS.close),
-            reset: normalizeInlineToken(parsed?.reset, DEFAULT_FORMAT_TOKENS.reset)
-          };
-        } catch {
-          return { ...DEFAULT_FORMAT_TOKENS };
-        }
-      })(),
+      formatTokens: loadFormatTokens(),
       moveBlockId: null,
       pendingSiteDelete: false
     };
@@ -736,7 +723,6 @@ dialog::backdrop{
       return div.innerText || div.textContent || '';
     }
 
-
     function sanitizeRichHtml(value) {
       const template = document.createElement('template');
       template.innerHTML = String(value ?? '');
@@ -761,153 +747,248 @@ dialog::backdrop{
       return template.innerHTML;
     }
 
-    function escapeRegExp(value) {
-      return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
 
-    function normalizeInlineToken(value, fallback) {
-      const token = String(value ?? '').replace(/\r?\n/g, '');
-      return token.length ? token : fallback;
-    }
+function stripNewlines(value) {
+  return String(value ?? '').replace(/[\r\n]+/g, '');
+}
 
-    function currentFormatTokens() {
-      const tokens = state.formatTokens || DEFAULT_FORMAT_TOKENS;
+function normalizeTokenValue(value, fallback) {
+  const cleaned = stripNewlines(value);
+  return cleaned.length ? cleaned.slice(0, 32) : fallback;
+}
+
+function escapeRegExp(value) {
+  return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function loadFormatTokens() {
+  const fallback = { ...DEFAULT_FORMAT_TOKENS };
+  try {
+    const raw = localStorage.getItem(FORMAT_TOKEN_SETTINGS_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return {
+      start: normalizeTokenValue(parsed?.start, fallback.start),
+      end: normalizeTokenValue(parsed?.end, fallback.end),
+      plain: normalizeTokenValue(parsed?.plain, fallback.plain)
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function currentFormatTokens() {
+  return {
+    start: normalizeTokenValue(state.formatTokens?.start, DEFAULT_FORMAT_TOKENS.start),
+    end: normalizeTokenValue(state.formatTokens?.end, DEFAULT_FORMAT_TOKENS.end),
+    plain: normalizeTokenValue(state.formatTokens?.plain, DEFAULT_FORMAT_TOKENS.plain)
+  };
+}
+
+function syncFormatTokenInputs() {
+  const tokens = currentFormatTokens();
+  if (formatStartTokenInput) formatStartTokenInput.value = tokens.start;
+  if (formatEndTokenInput) formatEndTokenInput.value = tokens.end;
+  if (formatPlainTokenInput) formatPlainTokenInput.value = tokens.plain;
+}
+
+function persistFormatTokenSettingsFromInputs() {
+  const next = {
+    start: normalizeTokenValue(formatStartTokenInput?.value, DEFAULT_FORMAT_TOKENS.start),
+    end: normalizeTokenValue(formatEndTokenInput?.value, DEFAULT_FORMAT_TOKENS.end),
+    plain: normalizeTokenValue(formatPlainTokenInput?.value, DEFAULT_FORMAT_TOKENS.plain)
+  };
+
+  state.formatTokens = next;
+  localStorage.setItem(FORMAT_TOKEN_SETTINGS_KEY, JSON.stringify(next));
+  syncFormatTokenInputs();
+  if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
+}
+
+function readFormatCommandAt(text, index, tokens) {
+  const startToken = escapeRegExp(tokens.start);
+  const plainToken = tokens.plain;
+  const endToken = tokens.end;
+
+  if (plainToken && text.startsWith(plainToken, index)) {
+    return { type: 'plain', length: plainToken.length };
+  }
+
+  if (endToken && text.startsWith(endToken, index)) {
+    return { type: 'end', length: endToken.length };
+  }
+
+  if (startToken) {
+    const colorMatch = text.slice(index).match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${startToken}`));
+    if (colorMatch) {
       return {
-        open: normalizeInlineToken(tokens.open, DEFAULT_FORMAT_TOKENS.open),
-        close: normalizeInlineToken(tokens.close, DEFAULT_FORMAT_TOKENS.close),
-        reset: normalizeInlineToken(tokens.reset, DEFAULT_FORMAT_TOKENS.reset)
+        type: 'color',
+        value: `#${colorMatch[1]}`,
+        length: colorMatch[0].length
       };
     }
 
-    function persistFormatTokens(tokens = {}) {
-      state.formatTokens = {
-        open: normalizeInlineToken(tokens.open, DEFAULT_FORMAT_TOKENS.open),
-        close: normalizeInlineToken(tokens.close, DEFAULT_FORMAT_TOKENS.close),
-        reset: normalizeInlineToken(tokens.reset, DEFAULT_FORMAT_TOKENS.reset)
+    const sizeMatch = text.slice(index).match(new RegExp(`^S(\\d{1,3})${startToken}`));
+    if (sizeMatch) {
+      return {
+        type: 'size',
+        value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))),
+        length: sizeMatch[0].length
       };
-      localStorage.setItem(FORMAT_TOKENS_KEY, JSON.stringify(state.formatTokens));
-      if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
     }
+  }
 
-    function getStandaloneStyleCommand(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const { open } = currentFormatTokens();
-      const escapedOpen = escapeRegExp(open);
+  return null;
+}
 
-      const colorMatch = text.match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${escapedOpen}$`));
-      if (colorMatch) {
-        return { type: 'color', value: `#${colorMatch[1]}` };
-      }
+function getStandaloneStyleCommand(input) {
+  const text = String(input ?? '').replace(/\r\n?/g, '\n').trim();
+  const tokens = currentFormatTokens();
+  const startToken = escapeRegExp(tokens.start);
 
-      const sizeMatch = text.match(new RegExp(`^S(\\d{1,3})${escapedOpen}$`));
-      if (sizeMatch) {
-        return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
-      }
+  const colorMatch = text.match(new RegExp(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})${startToken}$`));
+  if (colorMatch) {
+    return { type: 'color', value: `#${colorMatch[1]}` };
+  }
 
-      return null;
+  const sizeMatch = text.match(new RegExp(`^S(\\d{1,3})${startToken}$`));
+  if (sizeMatch) {
+    return { type: 'size', value: String(Math.max(1, Math.min(256, Number(sizeMatch[1]) || 16))) };
+  }
+
+  return null;
+}
+
+function renderStandaloneStyleCommand(command) {
+  if (!command) return '';
+  const tokens = currentFormatTokens();
+  const marker = esc(tokens.start);
+  if (command.type === 'color') {
+    return `<span style="color:${esc(command.value)}">${marker}</span>`;
+  }
+  if (command.type === 'size') {
+    return `<span style="font-size:${esc(command.value)}px">${marker}</span>`;
+  }
+  return '';
+}
+
+function parseStyledSource(input) {
+  const text = String(input ?? '').replace(/\r\n?/g, '\n');
+  const tokens = currentFormatTokens();
+
+  let html = '';
+  let color = '';
+  let size = '';
+  let spanOpen = false;
+
+  const currentStyle = () => {
+    const styles = [];
+    if (color) styles.push(`color:${color}`);
+    if (size) styles.push(`font-size:${size}px`);
+    return styles.join(';');
+  };
+
+  const closeSpan = () => {
+    if (spanOpen) {
+      html += '</span>';
+      spanOpen = false;
     }
+  };
 
-    function renderStandaloneStyleCommand(command) {
-      if (!command) return '';
-      const openToken = esc(currentFormatTokens().open);
-      if (command.type === 'color') {
-        return `<span style="color:${esc(command.value)}">${openToken}</span>`;
-      }
-      if (command.type === 'size') {
-        return `<span style="font-size:${esc(command.value)}px">${openToken}</span>`;
-      }
-      return '';
-    }
+  const openSpan = () => {
+    const style = currentStyle();
+    if (!style) return;
+    html += `<span style="${style}">`;
+    spanOpen = true;
+  };
 
-    function parseStyledSource(input) {
-      const text = String(input ?? '').replace(/\r\n?/g, '\n');
-      const tokens = currentFormatTokens();
-      const openToken = tokens.open;
-      const closeToken = tokens.close;
-      const resetToken = tokens.reset;
-      const escapedOpenToken = escapeRegExp(openToken);
-
-      let html = '';
-      let color = '';
-      let size = '';
-      let spanOpen = false;
-
-      const currentStyle = () => {
-        const styles = [];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${size}px`);
-        return styles.join(';');
-      };
-
-      const closeSpan = () => {
-        if (spanOpen) {
-          html += '</span>';
-          spanOpen = false;
-        }
-      };
-
-      const openSpan = () => {
-        const style = currentStyle();
-        if (!style) return;
-        html += `<span style="${style}">`;
-        spanOpen = true;
-      };
-
-      const outputPlain = (value) => {
-        if (value === '\n') {
-          html += '<br>';
-          return;
-        }
-        html += esc(value);
-      };
-
-      const commandPattern = new RegExp(`^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})|S(\\d{1,3}))${escapedOpenToken}`);
-
-      for (let i = 0; i < text.length;) {
-        const commandMatch = text.slice(i).match(commandPattern);
-        if (commandMatch) {
-          const rawCommand = commandMatch[1];
-          const commandText = commandMatch[0];
-          closeSpan();
-          html += esc(commandText);
-          if (rawCommand.startsWith('#')) {
-            color = rawCommand;
-          } else if (rawCommand.startsWith('S')) {
-            size = String(Math.max(1, Math.min(256, Number(rawCommand.slice(1)) || 16)));
-          }
-          i += commandText.length;
-          continue;
-        }
-
-        if (closeToken && text.startsWith(closeToken, i)) {
-          closeSpan();
-          html += esc(closeToken);
-          color = '';
-          size = '';
-          i += closeToken.length;
-          continue;
-        }
-
-        if (resetToken && text.startsWith(resetToken, i)) {
-          closeSpan();
-          html += esc(resetToken);
-          color = '';
-          size = '';
-          i += resetToken.length;
-          continue;
-        }
-
-        if (!spanOpen && (color || size)) openSpan();
-
-        outputPlain(text[i]);
-        i += 1;
-      }
-
+  const ensureSpan = () => {
+    if (color || size) {
+      if (!spanOpen) openSpan();
+    } else {
       closeSpan();
-      return html;
+    }
+  };
+
+  for (let i = 0; i < text.length;) {
+    const command = readFormatCommandAt(text, i, tokens);
+    if (command) {
+      if (command.type === 'plain') {
+        closeSpan();
+        html += esc(text.slice(i, i + command.length));
+        i += command.length;
+        continue;
+      }
+
+      if (command.type === 'end') {
+        if (!color && !size) {
+          html += esc(text.slice(i, i + command.length));
+          i += command.length;
+          continue;
+        }
+        closeSpan();
+        color = '';
+        size = '';
+        i += command.length;
+        continue;
+      }
+
+      if (command.type === 'color') {
+        color = command.value;
+        ensureSpan();
+        i += command.length;
+        continue;
+      }
+
+      if (command.type === 'size') {
+        size = command.value;
+        ensureSpan();
+        i += command.length;
+        continue;
+      }
     }
 
-    function getCookie(name) {
+    const ch = text[i];
+    if (ch === '\n') {
+      html += '<br>';
+    } else {
+      ensureSpan();
+      html += esc(ch);
+    }
+
+    i += 1;
+  }
+
+  closeSpan();
+  return html || '<br>';
+}
+
+    
+function containsRenderableFormatCommand(text) {
+  const source = String(text ?? '').replace(/\r\n?/g, '\n');
+  const tokens = currentFormatTokens();
+  let hasActiveStyle = false;
+
+  for (let i = 0; i < source.length;) {
+    const command = readFormatCommandAt(source, i, tokens);
+    if (command) {
+      if (command.type === 'plain') return true;
+      if (command.type === 'color' || command.type === 'size') {
+        hasActiveStyle = true;
+        return true;
+      }
+      if (command.type === 'end') {
+        if (hasActiveStyle) return true;
+        i += command.length;
+        continue;
+      }
+    }
+    i += Math.max(1, Number(command?.length || 1));
+  }
+
+  return false;
+}
+function getCookie(name) {
       const parts = document.cookie ? document.cookie.split('; ') : [];
       for (const part of parts) {
         const idx = part.indexOf('=');
@@ -1012,15 +1093,14 @@ dialog::backdrop{
     }
 
     function normalizeBlock(block = {}) {
-      const source = typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || '');
-      const html = source
-        ? parseStyledSource(source)
-        : (typeof block.html === 'string' && block.html.trim() ? sanitizeRichHtml(block.html) : '');
+      const html = typeof block.html === 'string' && block.html.trim()
+        ? sanitizeRichHtml(block.html)
+        : parseStyledSource(block.source || htmlToPlainText(block.html || ''));
 
       return {
         id: block.id || uid8(),
-        source,
-        html: html || '<br>',
+        source: typeof block.source === 'string' ? block.source : htmlToPlainText(block.html || ''),
+        html,
         visible: block.visible !== false,
         wrap: block.wrap !== false,
         heightEnabled: block.heightEnabled === true,
@@ -1437,13 +1517,7 @@ dialog::backdrop{
 
     function openHomeSettingsModal() {
       updateAddBarOpacityLabel();
-      const tokens = currentFormatTokens();
-      const openInput = document.getElementById('formatOpenTokenInput');
-      const closeInput = document.getElementById('formatCloseTokenInput');
-      const resetInput = document.getElementById('formatResetTokenInput');
-      if (openInput) openInput.value = tokens.open;
-      if (closeInput) closeInput.value = tokens.close;
-      if (resetInput) resetInput.value = tokens.reset;
+      syncFormatTokenInputs();
       if (!homeSettingsDialog.open) homeSettingsDialog.showModal();
     }
 
@@ -1538,16 +1612,8 @@ dialog::backdrop{
 
     async function saveHomeSettings() {
       localStorage.setItem(ADD_BAR_OPACITY_KEY, String(state.addBarOpacity));
-      const openInput = document.getElementById('formatOpenTokenInput');
-      const closeInput = document.getElementById('formatCloseTokenInput');
-      const resetInput = document.getElementById('formatResetTokenInput');
-      persistFormatTokens({
-        open: openInput?.value,
-        close: closeInput?.value,
-        reset: resetInput?.value
-      });
       if (homeSettingsDialog.open) homeSettingsDialog.close();
-      if (state.mode === 'editor' || state.mode === 'viewer') renderApp();
+      if (state.mode === 'editor') renderApp();
     }
 
     async function saveSiteSettings() {
@@ -1628,15 +1694,15 @@ dialog::backdrop{
 
       setDoc(doc(state.db, COLLECTION, state.current.siteId), {
         blocks: state.current.blocks.map((b) => {
-          const source = String(b.source || htmlToPlainText(b.html || ''));
+          const normalized = normalizeBlock(b);
           return {
-            id: b.id,
-            source,
-            html: parseStyledSource(source) || '<br>',
-            visible: b.visible !== false,
-            wrap: b.wrap !== false,
-            heightEnabled: b.heightEnabled === true,
-            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+            id: normalized.id,
+            source: normalized.source,
+            html: normalized.html || '<br>',
+            visible: normalized.visible !== false,
+            wrap: normalized.wrap !== false,
+            heightEnabled: normalized.heightEnabled === true,
+            rows: Math.max(1, Math.min(50, Number(normalized.rows || 3) || 3))
           };
         }),
         updatedAt: state.current.updatedAt
@@ -1710,18 +1776,15 @@ dialog::backdrop{
 
       const payload = {
         ...state.current,
-        blocks: state.current.blocks.map((b) => {
-          const source = String(b.source || htmlToPlainText(b.html || ''));
-          return {
-            id: b.id,
-            source,
-            html: parseStyledSource(source) || '<br>',
-            visible: b.visible !== false,
-            wrap: b.wrap !== false,
-            heightEnabled: b.heightEnabled === true,
-            rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
-          };
-        }),
+        blocks: state.current.blocks.map((b) => ({
+          id: b.id,
+          source: b.source || htmlToPlainText(b.html || ''),
+          html: b.html || parseStyledSource(b.source || ''),
+          visible: b.visible !== false,
+          wrap: b.wrap !== false,
+          heightEnabled: b.heightEnabled === true,
+          rows: Math.max(1, Math.min(50, Number(b.rows || 3) || 3))
+        })),
         collaborators: Array.isArray(state.current.collaborators) ? state.current.collaborators : [],
         updatedAt: Date.now()
       };
@@ -1848,11 +1911,37 @@ dialog::backdrop{
       if (idx < 0) return;
 
       const raw = element.innerText.replace(/\r/g, '');
-      const html = parseStyledSource(raw) || '<br>';
+      const trimmedRaw = raw.trim();
+      const standaloneCommand = getStandaloneStyleCommand(trimmedRaw);
+      const hasFormatCommand = containsRenderableFormatCommand(raw);
+      const parsedHtml = parseStyledSource(raw) || '<br>';
+      const isPendingStyleOnly = Boolean(
+        standaloneCommand &&
+        (standaloneCommand.type === 'color' || standaloneCommand.type === 'size') &&
+        parsedHtml === '<br>'
+      );
+      let html = parsedHtml;
 
-      if (element.innerHTML !== html) {
-        element.innerHTML = html;
-        requestAnimationFrame(() => placeCaretAtEnd(element));
+      if (standaloneCommand && trimmedRaw && !isPendingStyleOnly) {
+        html = renderStandaloneStyleCommand(standaloneCommand);
+      }
+
+      if (isPendingStyleOnly) {
+        html = element.innerHTML;
+      }
+
+      if (standaloneCommand || hasFormatCommand) {
+        if (!isPendingStyleOnly && element.innerHTML !== html) {
+          element.innerHTML = html;
+        }
+
+        if (document.activeElement === element) {
+          requestAnimationFrame(() => {
+            element.blur?.();
+            const selection = window.getSelection?.();
+            if (selection) selection.removeAllRanges();
+          });
+        }
       }
 
       state.current.blocks[idx].source = raw;
@@ -2114,6 +2203,11 @@ dialog::backdrop{
         return;
       }
 
+      if (target.id === 'formatStartTokenInput' || target.id === 'formatEndTokenInput' || target.id === 'formatPlainTokenInput') {
+        persistFormatTokenSettingsFromInputs();
+        return;
+      }
+
       if (target.id === 'titleInput' && state.current) {
         state.current.title = target.value;
         const heading = document.getElementById('editorHeading');
@@ -2138,11 +2232,6 @@ dialog::backdrop{
 
       if (target.id === 'blockHeightToggle') {
         blockRowsField.classList.toggle('hidden', !blockHeightToggle.checked);
-        return;
-      }
-
-      if (target.id === 'formatOpenTokenInput' || target.id === 'formatCloseTokenInput' || target.id === 'formatResetTokenInput') {
-        target.value = target.value.replace(/\r?\n/g, '');
         return;
       }
 
