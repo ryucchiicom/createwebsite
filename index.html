@@ -752,8 +752,10 @@ function stripNewlines(value) {
   return String(value ?? '').replace(/[\r\n]+/g, '');
 }
 
-function normalizeTokenValue(value) {
-  return stripNewlines(value).slice(0, 32);
+function normalizeTokenValue(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const cleaned = stripNewlines(value).slice(0, 32);
+  return cleaned;
 }
 
 function escapeRegExp(value) {
@@ -767,9 +769,9 @@ function loadFormatTokens() {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
-      start: normalizeTokenValue(parsed?.start ?? fallback.start),
-      end: normalizeTokenValue(parsed?.end ?? fallback.end),
-      plain: normalizeTokenValue(parsed?.plain ?? fallback.plain)
+      start: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'start') ? parsed.start : undefined, fallback.start),
+      end: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'end') ? parsed.end : undefined, fallback.end),
+      plain: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'plain') ? parsed.plain : undefined, fallback.plain)
     };
   } catch {
     return fallback;
@@ -778,9 +780,18 @@ function loadFormatTokens() {
 
 function currentFormatTokens() {
   return {
-    start: normalizeTokenValue(state.formatTokens?.start ?? DEFAULT_FORMAT_TOKENS.start),
-    end: normalizeTokenValue(state.formatTokens?.end ?? DEFAULT_FORMAT_TOKENS.end),
-    plain: normalizeTokenValue(state.formatTokens?.plain ?? DEFAULT_FORMAT_TOKENS.plain)
+    start: normalizeTokenValue(
+      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'start') ? state.formatTokens.start : undefined,
+      DEFAULT_FORMAT_TOKENS.start
+    ),
+    end: normalizeTokenValue(
+      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'end') ? state.formatTokens.end : undefined,
+      DEFAULT_FORMAT_TOKENS.end
+    ),
+    plain: normalizeTokenValue(
+      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'plain') ? state.formatTokens.plain : undefined,
+      DEFAULT_FORMAT_TOKENS.plain
+    )
   };
 }
 
@@ -793,9 +804,9 @@ function syncFormatTokenInputs() {
 
 function persistFormatTokenSettingsFromInputs() {
   const next = {
-    start: normalizeTokenValue(formatStartTokenInput?.value ?? ''),
-    end: normalizeTokenValue(formatEndTokenInput?.value ?? ''),
-    plain: normalizeTokenValue(formatPlainTokenInput?.value ?? '')
+    start: normalizeTokenValue(formatStartTokenInput?.value, DEFAULT_FORMAT_TOKENS.start),
+    end: normalizeTokenValue(formatEndTokenInput?.value, DEFAULT_FORMAT_TOKENS.end),
+    plain: normalizeTokenValue(formatPlainTokenInput?.value, DEFAULT_FORMAT_TOKENS.plain)
   };
 
   state.formatTokens = next;
@@ -913,11 +924,7 @@ function parseStyledSource(input) {
     const command = readFormatCommandAt(text, i, tokens);
     if (command) {
       if (command.type === 'plain') {
-        const plainText = text.slice(i, i + command.length);
-        const hadStyle = Boolean(color || size);
-        if (hadStyle) closeSpan();
-        html += esc(plainText);
-        if (hadStyle) openSpan();
+        html += esc(text.slice(i, i + command.length));
         i += command.length;
         continue;
       }
@@ -1916,25 +1923,14 @@ function getCookie(name) {
       const trimmedRaw = raw.trim();
       const standaloneCommand = getStandaloneStyleCommand(trimmedRaw);
       const hasFormatCommand = containsRenderableFormatCommand(raw);
-      const parsedHtml = parseStyledSource(raw) || '<br>';
-      const isPendingStyleOnly = Boolean(
-        standaloneCommand &&
-        (standaloneCommand.type === 'color' || standaloneCommand.type === 'size') &&
-        parsedHtml === '<br>'
-      );
-      let html = parsedHtml;
+      let html = parseStyledSource(raw) || '<br>';
 
-      if (standaloneCommand && trimmedRaw && !isPendingStyleOnly) {
+      if (standaloneCommand && html === '<br>') {
         html = renderStandaloneStyleCommand(standaloneCommand);
       }
 
-      if (isPendingStyleOnly) {
-        html = element.innerHTML;
-      }
-
-      const shouldBlurForToken = Boolean(standaloneCommand || hasFormatCommand);
-      if (shouldBlurForToken) {
-        if (!isPendingStyleOnly && element.innerHTML !== html) {
+      if (standaloneCommand || hasFormatCommand) {
+        if (element.innerHTML !== html) {
           element.innerHTML = html;
         }
 
@@ -1951,7 +1947,6 @@ function getCookie(name) {
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
-
     function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
