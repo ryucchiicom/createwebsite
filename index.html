@@ -753,9 +753,8 @@ function stripNewlines(value) {
 }
 
 function normalizeTokenValue(value, fallback) {
-  if (value === undefined || value === null) return fallback;
-  const cleaned = stripNewlines(value).slice(0, 32);
-  return cleaned;
+  const cleaned = stripNewlines(value);
+  return cleaned.length ? cleaned.slice(0, 32) : fallback;
 }
 
 function escapeRegExp(value) {
@@ -769,9 +768,9 @@ function loadFormatTokens() {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
-      start: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'start') ? parsed.start : undefined, fallback.start),
-      end: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'end') ? parsed.end : undefined, fallback.end),
-      plain: normalizeTokenValue(Object.prototype.hasOwnProperty.call(parsed || {}, 'plain') ? parsed.plain : undefined, fallback.plain)
+      start: normalizeTokenValue(parsed?.start, fallback.start),
+      end: normalizeTokenValue(parsed?.end, fallback.end),
+      plain: normalizeTokenValue(parsed?.plain, fallback.plain)
     };
   } catch {
     return fallback;
@@ -780,18 +779,9 @@ function loadFormatTokens() {
 
 function currentFormatTokens() {
   return {
-    start: normalizeTokenValue(
-      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'start') ? state.formatTokens.start : undefined,
-      DEFAULT_FORMAT_TOKENS.start
-    ),
-    end: normalizeTokenValue(
-      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'end') ? state.formatTokens.end : undefined,
-      DEFAULT_FORMAT_TOKENS.end
-    ),
-    plain: normalizeTokenValue(
-      Object.prototype.hasOwnProperty.call(state.formatTokens || {}, 'plain') ? state.formatTokens.plain : undefined,
-      DEFAULT_FORMAT_TOKENS.plain
-    )
+    start: normalizeTokenValue(state.formatTokens?.start, DEFAULT_FORMAT_TOKENS.start),
+    end: normalizeTokenValue(state.formatTokens?.end, DEFAULT_FORMAT_TOKENS.end),
+    plain: normalizeTokenValue(state.formatTokens?.plain, DEFAULT_FORMAT_TOKENS.plain)
   };
 }
 
@@ -924,6 +914,7 @@ function parseStyledSource(input) {
     const command = readFormatCommandAt(text, i, tokens);
     if (command) {
       if (command.type === 'plain') {
+        closeSpan();
         html += esc(text.slice(i, i + command.length));
         i += command.length;
         continue;
@@ -1923,14 +1914,24 @@ function getCookie(name) {
       const trimmedRaw = raw.trim();
       const standaloneCommand = getStandaloneStyleCommand(trimmedRaw);
       const hasFormatCommand = containsRenderableFormatCommand(raw);
-      let html = parseStyledSource(raw) || '<br>';
+      const parsedHtml = parseStyledSource(raw) || '<br>';
+      const isPendingStyleOnly = Boolean(
+        standaloneCommand &&
+        (standaloneCommand.type === 'color' || standaloneCommand.type === 'size') &&
+        parsedHtml === '<br>'
+      );
+      let html = parsedHtml;
 
-      if (standaloneCommand && html === '<br>') {
+      if (standaloneCommand && trimmedRaw && !isPendingStyleOnly) {
         html = renderStandaloneStyleCommand(standaloneCommand);
       }
 
+      if (isPendingStyleOnly) {
+        html = element.innerHTML;
+      }
+
       if (standaloneCommand || hasFormatCommand) {
-        if (element.innerHTML !== html) {
+        if (!isPendingStyleOnly && element.innerHTML !== html) {
           element.innerHTML = html;
         }
 
@@ -1947,6 +1948,7 @@ function getCookie(name) {
       state.current.blocks[idx].html = html;
       state.currentSaved = false;
     }
+
     function handleClick(target) {
       const openSiteBtn = target.closest('[data-open-site]');
       if (openSiteBtn) {
